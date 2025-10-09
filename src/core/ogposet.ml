@@ -53,19 +53,6 @@ module Sub = struct
     in
     { dims = IntSet.add dim s.dims; cells = IntMap.add dim updated s.cells }
 
-  let add_positions (s:t) ~dim (positions_set:IntSet.t) =
-    if dim < 0 then invalid_arg "Sub: negative dimension";
-    if IntSet.is_empty positions_set then s
-    else (
-      IntSet.iter (fun pos -> if pos < 0 then invalid_arg "Sub: negative position") positions_set;
-      let updated =
-        match lookup dim s.cells with
-        | None -> positions_set
-        | Some set -> IntSet.union positions_set set
-      in
-      { dims = IntSet.add dim s.dims; cells = IntMap.add dim updated s.cells }
-    )
-
   let mem_position (s:t) ~dim ~pos =
     match lookup dim s.cells with
     | Some set -> IntSet.mem pos set
@@ -97,7 +84,7 @@ module Sub = struct
 end
 
 module Embedding = struct
-  type t = { dom : t; cod : t; map : int array array }
+  type t = { dom : poset; cod : poset; map : int array array }
 end
 
 (* --- Helpers --- *)
@@ -328,84 +315,84 @@ let bd_out (g:t) (k:int) : Sub.t =
 (* --- Fast asymmetric pushout: attach complement of g(C) in B onto A --- *)
 
 let attach (f:Embedding.t) (g:Embedding.t) : t * Embedding.t * Embedding.t =
-  if f.dom != g.dom then invalid_arg "attach: embeddings must share domain";
-  let A = f.cod and B = g.cod and C = f.dom in
-  let sizeA n = if n <= A.max_dim then A.size.(n) else 0 in
-  let sizeB n = if n <= B.max_dim then B.size.(n) else 0 in
-  let dims = max (A.max_dim + 1) (B.max_dim + 1) in
-  let inv_g = Array.init dims (fun n -> Array.make (sizeB n) (-1)) in
-  for n=0 to C.max_dim do
-    for i=0 to C.size.(n)-1 do
+  if (f : Embedding.t).dom != (g : Embedding.t).dom then invalid_arg "attach: embeddings must share domain";
+  let a = f.cod and b = g.cod and c = f.dom in
+  let size_a n = if n <= a.max_dim then a.size.(n) else 0 in
+  let size_b n = if n <= b.max_dim then b.size.(n) else 0 in
+  let dims = max (a.max_dim + 1) (b.max_dim + 1) in
+  let inv_g = Array.init dims (fun n -> Array.make (size_b n) (-1)) in
+  for n=0 to c.max_dim do
+    for i=0 to c.size.(n)-1 do
       let jB = g.map.(n).(i) in
       inv_g.(n).(jB) <- i
     done
   done;
-  let P = ref A in
-  let mapB_to_P = Array.init dims (fun n -> Array.make (sizeB n) (-1)) in
-  for n=0 to B.max_dim do
+  let p = ref a in
+  let map_b_to_p = Array.init dims (fun n -> Array.make (size_b n) (-1)) in
+  for n=0 to b.max_dim do
     let comp = ref [] in
-    for j=0 to sizeB n - 1 do if inv_g.(n).(j) < 0 then comp := j :: !comp done;
+    for j=0 to size_b n - 1 do if inv_g.(n).(j) < 0 then comp := j :: !comp done;
     if !comp <> [] then (
       if n = 0 then (
         let count = List.length !comp in
-        let p_after, new_elts = add0 !P count in
-        P := p_after;
-        List.iter2 (fun j e -> mapB_to_P.(0).(j) <- e.pos) (List.rev !comp) new_elts
+        let p_after, new_elts = add0 !p count in
+        p := p_after;
+        List.iter2 (fun j e -> map_b_to_p.(0).(j) <- e.pos) (List.rev !comp) new_elts
       ) else (
         let in_subs = ref [] and out_subs = ref [] in
         let order = List.rev !comp in
         List.iter (fun j ->
           let map_face set =
             IntSet.fold (fun k acc ->
-              if k < sizeB (n-1) && inv_g.(n-1).(k) >= 0 then (
+              if k < size_b (n-1) && inv_g.(n-1).(k) >= 0 then (
                 let c = inv_g.(n-1).(k) in
                 let a_pos = f.map.(n-1).(c) in
                 Sub.add_position acc ~dim:(n-1) ~pos:a_pos
               ) else (
-                let ppos = mapB_to_P.(n-1).(k) in
+                let ppos = map_b_to_p.(n-1).(k) in
                 if ppos < 0 then invalid_arg "attach: lower-dim complement not yet added";
                 Sub.add_position acc ~dim:(n-1) ~pos:ppos
               )
-            ) set (Sub.empty !P)
+            ) set (Sub.empty !p)
           in
-          in_subs := map_face B.inputs.(n).(j) :: !in_subs;
-          out_subs := map_face B.outputs.(n).(j) :: !out_subs
+          in_subs := map_face b.inputs.(n).(j) :: !in_subs;
+          out_subs := map_face b.outputs.(n).(j) :: !out_subs
         ) order;
-        let p_after, new_elts = addN !P ~dim:n ~inputs:(List.rev !in_subs) ~outputs:(List.rev !out_subs) in
-        P := p_after;
-        List.iter2 (fun j e -> mapB_to_P.(n).(j) <- e.pos) order new_elts
+        let p_after, new_elts = addN !p ~dim:n ~inputs:(List.rev !in_subs) ~outputs:(List.rev !out_subs) in
+        p := p_after;
+        List.iter2 (fun j e -> map_b_to_p.(n).(j) <- e.pos) order new_elts
       )
     )
   done;
-  let P_final = !P in
-  let mapA = Array.init dims (fun n -> Array.init (sizeA n) (fun i -> i)) in
-  let mapB = Array.init dims (fun n ->
-    Array.init (sizeB n) (fun j ->
-      if j < sizeB n && inv_g.(n).(j) >= 0 then
+  let p_final = !p in
+  let map_a = Array.init dims (fun n -> Array.init (size_a n) (fun i -> i)) in
+  let map_b = Array.init dims (fun n ->
+    Array.init (size_b n) (fun j ->
+      if j < size_b n && inv_g.(n).(j) >= 0 then
         let c = inv_g.(n).(j) in
-        if n <= A.max_dim then f.map.(n).(c) else invalid_arg "attach: dim mismatch"
-      else mapB_to_P.(n).(j)
+        if n <= a.max_dim then f.map.(n).(c) else invalid_arg "attach: dim mismatch"
+      else map_b_to_p.(n).(j)
     ))
   in
-  let iotaA = Embedding.{ dom = A; cod = P_final; map = mapA } in
-  let iotaB = Embedding.{ dom = B; cod = P_final; map = mapB } in
-  (P_final, iotaA, iotaB)
+  let iota_a = Embedding.{ dom = a; cod = p_final; map = map_a } in
+  let iota_b = Embedding.{ dom = b; cod = p_final; map = map_b } in
+  (p_final, iota_a, iota_b)
 
 (* --- Heuristic pushout: choose cheaper direction --- *)
 
 let pushout (f:Embedding.t) (g:Embedding.t) : t * Embedding.t * Embedding.t =
   if f.dom != g.dom then invalid_arg "pushout: embeddings must share domain";
-  let A = f.cod and B = g.cod and C = f.dom in
+  let a = f.cod and b = g.cod and c = f.dom in
   let size_total x =
     let s = ref 0 in
     for n=0 to x.max_dim do s := !s + x.size.(n) done; !s
   in
-  let a_tot = size_total A and b_tot = size_total B and c_tot = size_total C in
+  let a_tot = size_total a and b_tot = size_total b and c_tot = size_total c in
   let add_B_into_A = b_tot - c_tot in
   let add_A_into_B = a_tot - c_tot in
   if add_B_into_A <= add_A_into_B then
     attach f g
   else
-    let p, iB, iA = attach g f in
-    (p, iA, iB)
+    let p, i_b, i_a = attach g f in
+    (p, i_a, i_b)
     

@@ -1,7 +1,5 @@
 (* ogposet.mli — interface for oriented graded posets, IntSet pluggable by redefining module IntSet *)
 
-module IntSet : Set.S with type elt = int
-
 (** Elements (opaque). *)
 type elt
 
@@ -14,13 +12,6 @@ module Sub : sig
   type t
   val empty : poset -> t
   val of_list : poset -> elt list -> t
-  val of_dim_set : poset -> dim:int -> IntSet.t -> t
-  val dims : t -> IntSet.t
-  val positions : t -> dim:int -> IntSet.t
-  val add_position : t -> dim:int -> pos:int -> t
-  val add_positions : t -> dim:int -> IntSet.t -> t
-  val mem_position : t -> dim:int -> pos:int -> bool
-  val iter : t -> f:(dim:int -> pos:int -> unit) -> unit
 end
 
 (** Embeddings between OGPosets. *)

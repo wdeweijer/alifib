@@ -1,2 +1,2 @@
 (library
- (name alifib.core))
+ (name alifib_core))
