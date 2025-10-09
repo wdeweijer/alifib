@@ -1,2 +1,1 @@
-let () =
-  print_endline "Alifib core loaded successfully."
+let () = print_endline "Alifib core loaded successfully."

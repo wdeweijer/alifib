@@ -1,6 +1,11 @@
 type t = int
+
 let counter = ref 0
-let fresh () = let i = !counter in incr counter; i
+
+let fresh () =
+  let i = !counter in
+  incr counter ; i
+
 let equal = Int.equal
 let compare = Int.compare
 let hash = Hashtbl.hash

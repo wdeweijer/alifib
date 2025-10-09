@@ -1,0 +1,26 @@
+profile = conventional
+margin = 80
+
+# Compact but readable
+break-cases = nested
+break-infix = wrap
+break-sequences = false
+let-binding-spacing = compact
+sequence-style = before
+if-then-else = compact
+
+# Documentation and comments
+parse-docstrings = true
+doc-comments = before
+
+# Clean whitespace & delimiters
+indicate-multiline-delimiters = no
+field-space = tight
+type-decl = compact
+
+# Strings & comments
+wrap-comments = true
+break-string-literals = auto
+
+# Keep .mli sections tight (no extra blank lines between defs)
+module-item-spacing = compact
