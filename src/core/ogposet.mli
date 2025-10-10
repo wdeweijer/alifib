@@ -1,56 +1,68 @@
-(* ogposet.mli — interface for oriented graded posets, IntSet pluggable by
-   redefining module IntSet *)
+(** {1 Oriented graded posets (ogposets)}
 
-(** Elements (opaque). *)
-type elt
+    Minimal internal data structure with embeddings and standard
+    categorical constructions. No well-formedness checks are performed;
+    this module is designed for use inside verified higher-level code. *)
 
-(** The main OGPoset type (opaque). *)
+(** {2 Core types} *)
+
 type t
-
 type poset = t
-type sign = In | Out
+(** An oriented graded poset (ogposet). *)
 
-(** Graded subsets. *)
-module Sub : sig
-  type t
+type intset
+(** Abstract type of sets of integers used for faces and cofaces. *)
 
-  val empty : t
-  val of_list : elt list -> t
-  val of_dim : dim:int -> t -> t
-  val union : t -> t -> t
-  val intersection : t -> t -> t
-  val add : t -> elt -> t
-end
+type sign = [ `Input | `Output | `Both ]
+(** Orientation: input, output, or both. *)
 
-(** Embeddings between OGPosets. *)
+val make :
+  dim:int ->
+  faces_in:  intset array array ->
+  faces_out: intset array array ->
+  cofaces_in:  intset array array ->
+  cofaces_out: intset array array ->
+  t
+(** Build an ogposet directly from adjacency arrays of integer sets and its dimension. *)
+
+val dim   : t -> int
+val sizes : t -> int array
+
+(** {2 Local structure} *)
+
+val faces_of   : sign -> t -> dim:int -> pos:int -> intset
+val cofaces_of : sign -> t -> dim:int -> pos:int -> intset
+(** Access the input/output/both faces or cofaces of a given element. *)
+
+(** {2 Embeddings (morphisms of ogposets)} *)
+
 module Embedding : sig
   type t
-
-  val dom : t -> poset
-  val cod : t -> poset
+  val make    : dom:poset -> cod:poset -> map:int array array -> t
+  val dom     : t -> poset
+  val cod     : t -> poset
+  val map     : t -> int array array
+  val id      : poset -> t
   val compose : t -> t -> t
 end
 
-(** Constructors and modifications. *)
-val empty : t
+(** {2 Universal constructions} *)
 
-val add0 : t -> int -> t * elt list
+type coproduct = { sum : t; inl : Embedding.t; inr : Embedding.t }
+val coproduct : t -> t -> coproduct
 
-val addN :
-  t -> dim:int -> inputs:Sub.t list -> outputs:Sub.t list -> t * elt list
+type pushout = { po : t; leg1 : Embedding.t; leg2 : Embedding.t }
+val pushout : Embedding.t -> Embedding.t -> pushout
 
-(** Accessors. *)
-val faces : t -> sign -> elt -> Sub.t
-val cofaces : t -> sign -> elt -> Sub.t
+type coequaliser = { coeq : t; emb : Embedding.t }
+val coequaliser : Embedding.t -> Embedding.t -> coequaliser
 
-(** Derived structures and operations. *)
-val closure : t -> Sub.t -> Sub.t
+(** {2 Derived substructures} *)
 
-val embed : t -> Sub.t -> t * Embedding.t
-val bd : t -> sign -> int -> Sub.t
+val boundary : sign -> int -> t -> t * Embedding.t
+(** [boundary sign at_dim X] is the induced sub-ogposet on the downward
+    closure of those [at_dim]-cells of [X] having no cofaces of the given
+    orientation, together with its inclusion embedding. *)
 
-(** Heuristic pushout: automatically choose the cheaper attachment direction. *)
-val pushout : Embedding.t -> Embedding.t -> t * Embedding.t * Embedding.t
-
-(** Coequaliser of two embeddings with common domain. *)
-val coequaliser : Embedding.t -> Embedding.t -> t * Embedding.t * Embedding.t
+val boundary_top : sign -> t -> t * Embedding.t
+(** [boundary_top sign X] = [boundary sign (dim X - 1) X]. *)
