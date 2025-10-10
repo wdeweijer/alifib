@@ -20,6 +20,7 @@ type t = {
 }
 
 type poset = t
+type sign = In | Out
 
 module Sub = struct
   module IntMap = Map.Make (Int)
@@ -37,6 +38,7 @@ module Sub = struct
     let updated = IntSet.add pos (positions s ~dim) in
     { dims= IntSet.add dim s.dims; cells= IntMap.add dim updated s.cells }
 
+  let add (s : t) (e : elt) = add_position s ~dim:e.dim ~pos:e.pos
   let mem_position (s : t) ~dim ~pos = IntSet.mem pos (positions s ~dim)
 
   let iter (s : t) ~f =
@@ -44,10 +46,7 @@ module Sub = struct
       (fun dim -> IntSet.iter (fun pos -> f ~dim ~pos) (positions s ~dim))
       s.dims
 
-  let of_list (els : elt list) : t =
-    List.fold_left
-      (fun acc e -> add_position acc ~dim:e.dim ~pos:e.pos)
-      empty els
+  let of_list (els : elt list) : t = List.fold_left add empty els
 
   let of_dim_set ~dim (set : IntSet.t) : t =
     if IntSet.is_empty set then empty
@@ -82,6 +81,9 @@ module Sub = struct
       (IntSet.inter a.dims b.dims)
       empty
 end
+
+let faces_array g = function In -> g.inputs | Out -> g.outputs
+let cofaces_array g = function In -> g.coinputs | Out -> g.cooutputs
 
 module Embedding = struct
   type t = { dom: poset; cod: poset; map: int array array }
@@ -227,23 +229,18 @@ let addN (g : t) ~(dim : int) ~(inputs : Sub.t list) ~(outputs : Sub.t list) :
 
 (* --- Accessors --- *)
 
-let get_faces (_g : t) arr (e : elt) : Sub.t =
+let faces (g : t) (sign : sign) (e : elt) : Sub.t =
   if e.dim = 0 then Sub.empty
-  else Sub.of_dim_set ~dim:(e.dim - 1) arr.(e.dim).(e.pos)
+  else
+    let arr = faces_array g sign in
+    Sub.of_dim_set ~dim:(e.dim - 1) arr.(e.dim).(e.pos)
 
-let get_cofaces (g : t) arr (e : elt) : Sub.t =
+let cofaces (g : t) (sign : sign) (e : elt) : Sub.t =
   let next_dim = e.dim + 1 in
   if next_dim > g.max_dim then Sub.empty
-  else Sub.of_dim_set ~dim:next_dim arr.(e.dim).(e.pos)
-
-let inputs g e = get_faces g g.inputs e
-let outputs g e = get_faces g g.outputs e
-
-let coinputs g e =
-  if e.dim >= g.max_dim then Sub.empty else get_cofaces g g.coinputs e
-
-let cooutputs g e =
-  if e.dim >= g.max_dim then Sub.empty else get_cofaces g g.cooutputs e
+  else
+    let arr = cofaces_array g sign in
+    Sub.of_dim_set ~dim:next_dim arr.(e.dim).(e.pos)
 
 (* --- Closure (downward) --- *)
 
@@ -256,16 +253,16 @@ let closure (g : t) (s : Sub.t) : Sub.t =
       for n = g.max_dim downto 0 do
         while not (Queue.is_empty q.(n)) do
           let i = Queue.take q.(n) in
-          if n > 0 then (
-            let add_faces faces =
-              IntSet.iter
-                (fun j ->
-                  if not (Sub.mem_position !res ~dim:(n - 1) ~pos:j) then (
-                    res := Sub.add_position !res ~dim:(n - 1) ~pos:j
-                    ; Queue.add j q.(n - 1)))
-                faces.(n).(i)
-            in
-            add_faces g.inputs ; add_faces g.outputs)
+          if n > 0 then
+            List.iter
+              (fun sign ->
+                IntSet.iter
+                  (fun j ->
+                    if not (Sub.mem_position !res ~dim:(n - 1) ~pos:j) then (
+                      res := Sub.add_position !res ~dim:(n - 1) ~pos:j
+                      ; Queue.add j q.(n - 1)))
+                  (faces_array g sign).(n).(i))
+              [ In; Out ]
         done
       done
       ; !res
@@ -339,18 +336,22 @@ let has_any_coface g n i =
       (IntSet.is_empty g.coinputs.(n).(i) && IntSet.is_empty g.cooutputs.(n).(i))
   else false
 
-let is_input_face g k i =
-  if k < g.max_dim then IntSet.is_empty g.cooutputs.(k).(i) else true
+let is_face g sign k i =
+  if k < g.max_dim then
+    match sign with
+    | In ->
+        IntSet.is_empty g.cooutputs.(k).(i)
+    | Out ->
+        IntSet.is_empty g.coinputs.(k).(i)
+  else true
 
-let is_output_face g k i =
-  if k < g.max_dim then IntSet.is_empty g.coinputs.(k).(i) else true
-
-let boundary (g : t) (k : int) face_pred =
+let boundary (g : t) (sign : sign) (k : int) =
   if k > g.max_dim then Sub.empty
   else
     let subset = ref Sub.empty in
     for i = 0 to g.size.(k) - 1 do
-      if face_pred k i then subset := Sub.add_position !subset ~dim:k ~pos:i
+      if is_face g sign k i then
+        subset := Sub.add_position !subset ~dim:k ~pos:i
     done
     ; for j = 0 to k - 1 do
         for i = 0 to g.size.(j) - 1 do
@@ -360,8 +361,7 @@ let boundary (g : t) (k : int) face_pred =
       done
     ; closure g !subset
 
-let bd_in (g : t) (k : int) : Sub.t = boundary g k (is_input_face g)
-let bd_out (g : t) (k : int) : Sub.t = boundary g k (is_output_face g)
+let bd (g : t) (sign : sign) (k : int) : Sub.t = boundary g sign k
 
 (* --- Fast asymmetric pushout: attach complement of g(C) in B onto A --- *)
 
