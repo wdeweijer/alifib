@@ -62,7 +62,7 @@ module Embedding = struct
 
   let id x =
     let sz = sizes x in
-    let map = Array.mapi (fun _ n -> Array.init n (fun i -> i)) sz in
+    let map = Array.map (fun n -> Array.init n (fun i -> i)) sz in
     { dom= x; cod= x; map }
 
   let compose f g =
@@ -108,10 +108,10 @@ let ensure_dims x target =
 type inj = { map: int array array }
 
 let disjoint_union b c : t * inj * inj =
-  let dims = max b.dim c.dim + 1 in
-  let b = ensure_dims b dims and c = ensure_dims c dims in
+  let target = max b.dim c.dim + 1 in
+  let b = ensure_dims b target and c = ensure_dims c target in
   let szb = sizes b and szc = sizes c in
-  let szu = Array.init dims (fun d -> szb.(d) + szc.(d)) in
+  let szu = Array.init target (fun d -> szb.(d) + szc.(d)) in
   let inj_b = Array.mapi (fun _ n -> Array.init n (fun i -> i)) szb
   and inj_c =
     Array.mapi (fun d _ -> Array.init szc.(d) (fun i -> szb.(d) + i)) szb
@@ -120,15 +120,15 @@ let disjoint_union b c : t * inj * inj =
   and shift_up d x = if d = 0 then x else szb.(d - 1) + x
   and shift_up_co d x = szb.(d + 1) + x in
   let merge_faces fb fc =
-    Array.init dims (fun d ->
+    Array.init target (fun d ->
         let n = szu.(d) in
         Array.init n (fun k ->
             if k < szb.(d) then set_map (shift_down d) fb.(d).(k)
             else set_map (shift_up d) fc.(d).(k - szb.(d))))
   and merge_cofaces cb cc =
-    if dims = 0 then [||]
+    if target = 0 then [||]
     else
-      Array.init dims (fun d ->
+      Array.init target (fun d ->
           let n = szu.(d) in
           Array.init n (fun k ->
               if k < szb.(d) then set_map (shift_up_co d) cb.(d).(k)
@@ -136,7 +136,7 @@ let disjoint_union b c : t * inj * inj =
   in
   let u =
     {
-      dim= dims - 1;
+      dim= target - 1;
       faces_in= merge_faces b.faces_in c.faces_in;
       faces_out= merge_faces b.faces_out c.faces_out;
       cofaces_in= merge_cofaces b.cofaces_in c.cofaces_in;
