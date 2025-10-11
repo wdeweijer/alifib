@@ -144,6 +144,68 @@ let maximal (k : int) (g : t) : intset =
   done
   ; !acc
 
+let is_pure (g : t) : bool =
+  let n = g.dim in
+  if n <= 1 then true
+  else
+    let rec aux k =
+      if k >= n then true else IntSet.is_empty (maximal k g) && aux (k + 1)
+    in
+    aux 0
+
+let is_round (g : t) : bool =
+  let n = g.dim in
+  if n <= 1 then true
+  else if not (is_pure g) then false
+  else
+    (* Propagate input/output interior cells dimension by dimension, while
+       avoiding cells already claimed at the previous level. *)
+    let in_interior = Array.make n [||] in
+    let out_interior = Array.make n [||] in
+    let rec step j =
+      if j >= n then true
+      else
+        let build_layer base =
+          let layer = Array.init (j + 1) (fun _ -> IntSet.empty) in
+          layer.(j) <- base
+          ; let prev_in = if j = 0 then None else Some in_interior.(j - 1)
+            and prev_out = if j = 0 then None else Some out_interior.(j - 1) in
+            for i = j - 1 downto 0 do
+              let prev_in_i =
+                match prev_in with None -> IntSet.empty | Some arr -> arr.(i)
+              and prev_out_i =
+                match prev_out with None -> IntSet.empty | Some arr -> arr.(i)
+              in
+              IntSet.iter
+                (fun p ->
+                  let faces = faces_of `Both g ~dim:(i + 1) ~pos:p in
+                  IntSet.iter
+                    (fun q ->
+                      if
+                        (not (IntSet.mem q prev_in_i))
+                        && not (IntSet.mem q prev_out_i)
+                      then layer.(i) <- IntSet.add q layer.(i))
+                    faces)
+                layer.(i + 1)
+            done
+            ; layer
+        in
+        let layer_in = build_layer (extremal `Input j g)
+        and layer_out = build_layer (extremal `Output j g) in
+        let rec has_overlap i =
+          if i < 0 then false
+          else
+            let overlap = IntSet.inter layer_in.(i) layer_out.(i) in
+            if IntSet.is_empty overlap then has_overlap (i - 1) else true
+        in
+        if has_overlap j then false
+        else (
+          in_interior.(j) <- layer_in
+          ; out_interior.(j) <- layer_out
+          ; step (j + 1))
+    in
+    step 0
+
 type embedding_data = {
   forward: int array array; (* boundary index -> original index in g *)
   inverse: int array array; (* original index in g -> boundary index, or -1 *)

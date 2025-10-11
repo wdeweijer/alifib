@@ -32,14 +32,12 @@ val point : t
 val dim : t -> int
 val sizes : t -> int array
 
-(** {2 Local structure} *)
-
 (** Access the input/output/both faces or cofaces of a given element. *)
 val faces_of : sign -> t -> dim:int -> pos:int -> intset
 
 val cofaces_of : sign -> t -> dim:int -> pos:int -> intset
 
-(** {2 Embeddings (morphisms of ogposets)} *)
+(** {2 Embeddings} *)
 
 module Embedding : sig
   type t
@@ -59,7 +57,11 @@ end
    = k-cells with no input cofaces, extremal `Both k g` = union of the two *)
 val extremal : sign -> int -> t -> intset
 val maximal : int -> t -> intset
+val is_pure : t -> bool
 
-(** [boundary sign at_dim X] is the appropriate boundary of X as an ogposet,
-    together with its embedding into X *)
+(* roundness predicate; to be run exclusively on molecules *)
+val is_round : t -> bool
+
+(** [boundary sign at_dim X] is the embedding of the appropriate boundary of X
+    into it *)
 val boundary : sign -> int -> t -> t * Embedding.t
