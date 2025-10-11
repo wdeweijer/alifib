@@ -42,10 +42,13 @@ val cofaces_of : sign -> t -> dim:int -> pos:int -> intset
 module Embedding : sig
   type t
 
-  val make : dom:poset -> cod:poset -> map:int array array -> t
+  val make :
+    dom:poset -> cod:poset -> map:int array array -> inv:int array array -> t
+
   val dom : t -> poset
   val cod : t -> poset
   val map : t -> int array array
+  val inv : t -> int array array
   val empty : poset -> t
   val id : poset -> t
   val compose : t -> t -> t
@@ -53,13 +56,14 @@ end
 
 (** {2 Boundary operations} *)
 
-(* extremal `Input k g` = k-cells with no output cofaces, extremal `Output k g`
-   = k-cells with no input cofaces, extremal `Both k g` = union of the two *)
+(** extremal `Input k g` = k-cells with no output cofaces, extremal `Output k g`
+    = k-cells with no input cofaces, extremal `Both k g` = union of the two *)
 val extremal : sign -> int -> t -> intset
+
 val maximal : int -> t -> intset
 val is_pure : t -> bool
 
-(* roundness predicate; to be run exclusively on molecules *)
+(** roundness predicate; to be run exclusively on molecules *)
 val is_round : t -> bool
 
 (** [boundary sign at_dim X] is the embedding of the appropriate boundary of X

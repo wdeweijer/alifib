@@ -72,18 +72,29 @@ let cofaces_of sign x ~dim ~pos =
 (* --- Embeddings ------------------------------------------------------- *)
 
 module Embedding = struct
-  type t = { dom: poset; cod: poset; map: int array array }
+  type t = {
+    dom: poset;
+    cod: poset;
+    map: int array array;
+    inv: int array array;
+  }
 
-  let make ~dom ~cod ~map = { dom; cod; map }
   let dom e = e.dom
   let cod e = e.cod
   let map e = e.map
-  let empty cod = { dom= empty; cod; map= [||] }
+  let inv e = e.inv
+  let make ~dom ~cod ~map ~inv = { dom; cod; map; inv }
+
+  let empty cod =
+    let map = [||] in
+    let inv = Array.map (fun n -> Array.make n (-1)) (sizes cod) in
+    make ~dom:empty ~cod ~map ~inv
 
   let id x =
     let sz = sizes x in
-    let map = Array.map (fun n -> Array.init n (fun i -> i)) sz in
-    { dom= x; cod= x; map }
+    let map = Array.mapi (fun _ n -> Array.init n (fun i -> i)) sz in
+    let inv = Array.map Array.copy map in
+    make ~dom:x ~cod:x ~map ~inv
 
   let compose f g =
     let map =
@@ -94,7 +105,18 @@ module Embedding = struct
               g.map.(d).(mid)))
         f.map
     in
-    { dom= f.dom; cod= g.cod; map }
+    let inv =
+      Array.init (Array.length g.inv) (fun d ->
+          let cod_level = g.inv.(d) in
+          Array.init (Array.length cod_level) (fun idx ->
+              let mid = cod_level.(idx) in
+              if mid < 0 then -1
+              else if d >= Array.length f.inv then -1
+              else
+                let finv_level = f.inv.(d) in
+                if mid >= Array.length finv_level then -1 else finv_level.(mid)))
+    in
+    make ~dom:f.dom ~cod:g.cod ~map ~inv
 end
 
 (* --- Utility helpers -------------------------------------------------- *)
@@ -158,57 +180,57 @@ let is_round (g : t) : bool =
   if n <= 1 then true
   else if not (is_pure g) then false
   else
-    (* Propagate input/output interior cells dimension by dimension, while
-       avoiding cells already claimed at the previous level. *)
-    let in_interior = Array.make n [||] in
-    let out_interior = Array.make n [||] in
-    let rec step j =
-      if j >= n then true
-      else
-        let build_layer base =
-          let layer = Array.init (j + 1) (fun _ -> IntSet.empty) in
-          layer.(j) <- base
-          ; let prev_in = if j = 0 then None else Some in_interior.(j - 1)
-            and prev_out = if j = 0 then None else Some out_interior.(j - 1) in
-            for i = j - 1 downto 0 do
-              let prev_in_i =
-                match prev_in with None -> IntSet.empty | Some arr -> arr.(i)
-              and prev_out_i =
-                match prev_out with None -> IntSet.empty | Some arr -> arr.(i)
-              in
-              IntSet.iter
-                (fun p ->
-                  let faces = faces_of `Both g ~dim:(i + 1) ~pos:p in
-                  IntSet.iter
-                    (fun q ->
-                      if
-                        (not (IntSet.mem q prev_in_i))
-                        && not (IntSet.mem q prev_out_i)
-                      then layer.(i) <- IntSet.add q layer.(i))
-                    faces)
-                layer.(i + 1)
-            done
+    let sz = sizes g in
+    if sz.(n) = 1 then true
+    else
+      (* Propagate input/output interior cells dimension by dimension, removing
+         elements already claimed by earlier interiors. *)
+      let in_interior = Array.make n [||] in
+      let out_interior = Array.make n [||] in
+      let accum_in = Array.make n IntSet.empty in
+      let accum_out = Array.make n IntSet.empty in
+      let rec step j =
+        if j >= n then true
+        else
+          let build_layer base =
+            let layer = Array.init (j + 1) (fun _ -> IntSet.empty) in
+            layer.(j) <- base
+            ; for i = j - 1 downto 0 do
+                IntSet.iter
+                  (fun p ->
+                    let faces = faces_of `Both g ~dim:(i + 1) ~pos:p in
+                    layer.(i) <- IntSet.union layer.(i) faces)
+                  layer.(i + 1)
+                ; let prev = IntSet.union accum_in.(i) accum_out.(i) in
+                  layer.(i) <- IntSet.diff layer.(i) prev
+              done
             ; layer
-        in
-        let layer_in = build_layer (extremal `Input j g)
-        and layer_out = build_layer (extremal `Output j g) in
-        let rec has_overlap i =
-          if i < 0 then false
-          else
-            let overlap = IntSet.inter layer_in.(i) layer_out.(i) in
-            if IntSet.is_empty overlap then has_overlap (i - 1) else true
-        in
-        if has_overlap j then false
-        else (
-          in_interior.(j) <- layer_in
-          ; out_interior.(j) <- layer_out
-          ; step (j + 1))
-    in
-    step 0
+          in
+          let layer_in = build_layer (extremal `Input j g)
+          and layer_out = build_layer (extremal `Output j g) in
+          let rec has_overlap i =
+            if i < 0 then false
+            else
+              let overlap = IntSet.inter layer_in.(i) layer_out.(i) in
+              if IntSet.is_empty overlap then has_overlap (i - 1) else true
+          in
+          if has_overlap j then false
+          else (
+            in_interior.(j) <- layer_in
+            ; out_interior.(j) <- layer_out
+            ; for i = 0 to j do
+                accum_in.(i) <- IntSet.union accum_in.(i) layer_in.(i)
+              done
+            ; for i = 0 to j do
+                accum_out.(i) <- IntSet.union accum_out.(i) layer_out.(i)
+              done
+            ; step (j + 1))
+      in
+      step 0
 
 type embedding_data = {
   forward: int array array; (* boundary index -> original index in g *)
-  inverse: int array array; (* original index in g -> boundary index, or -1 *)
+  inv_dom: int array array; (* original index in g -> boundary index, or -1 *)
 }
 
 let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
@@ -221,7 +243,7 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
     (* Accumulators: per-dimension lists in insertion order (we’ll reverse
        once). *)
     let acc : int list array = Array.init dims_b (fun _ -> []) in
-    let inv : int array array =
+    let inv_dom : int array array =
       Array.init dims_b (fun j -> Array.make sz_g.(j) (-1))
     in
     let next_new_index : int array = Array.make dims_b 0 in
@@ -229,7 +251,7 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
     (* Insert into F at level j; also update inv and next_new_index. *)
     let insert_F (j : int) (old : int) =
       let i = next_new_index.(j) in
-      inv.(j).(old) <- i
+      inv_dom.(j).(old) <- i
       ; acc.(j) <- old :: acc.(j)
       ; next_new_index.(j) <- i + 1
     in
@@ -246,7 +268,7 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
         List.iter
           (fun parent_old ->
             IntSet.iter
-              (fun f -> if inv.(j).(f) < 0 then insert_F j f)
+              (fun f -> if inv_dom.(j).(f) < 0 then insert_F j f)
               (faces_of `Both g ~dim:(j + 1) ~pos:parent_old))
           parents
         ; (* (2) maximal j-cells: no checks needed (cannot be faces of
@@ -260,7 +282,7 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
         Array.init dims_b (fun j -> acc.(j) |> List.rev |> Array.of_list)
       in
 
-      let ed : embedding_data = { forward; inverse= inv } in
+      let ed : embedding_data = { forward; inv_dom } in
 
       (* Local helper: remap an adjacency family using the already-built maps. -
          shift = -1 → faces (use set_map; all targets are guaranteed present) -
@@ -279,13 +301,13 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
                   if shift = -1 then
                     (* faces: every referenced face must be in the boundary by
                        construction *)
-                    set_map (fun x -> ed.inverse.(target_dim).(x)) adj.(j).(old)
+                    set_map (fun x -> ed.inv_dom.(target_dim).(x)) adj.(j).(old)
                   else
                     (* cofaces: may reference cells outside the boundary; filter
                        those out *)
                     set_filter_map
                       (fun x ->
-                        let y = ed.inverse.(target_dim).(x) in
+                        let y = ed.inv_dom.(target_dim).(x) in
                         if y < 0 then None else Some y)
                       adj.(j).(old)))
       in
@@ -306,5 +328,9 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
           cofaces_out= cofaces_out';
         }
       in
-      let emb = Embedding.make ~dom:sub ~cod:g ~map:ed.forward in
+      let cod_inv =
+        Array.init (Array.length sz_g) (fun d ->
+            if d < dims_b then ed.inv_dom.(d) else Array.make sz_g.(d) (-1))
+      in
+      let emb = Embedding.make ~dom:sub ~cod:g ~map:ed.forward ~inv:cod_inv in
       (sub, emb)
