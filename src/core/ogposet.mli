@@ -6,9 +6,9 @@
 
 (** {2 Core types} *)
 
+(** An oriented graded poset (ogposet). *)
 type t
 
-(** An oriented graded poset (ogposet). *)
 type poset = t
 
 (** Abstract type of sets of integers used for faces and cofaces. *)
@@ -27,14 +27,16 @@ val make :
   cofaces_out:intset array array ->
   t
 
+val empty : t
+val point : t
 val dim : t -> int
 val sizes : t -> int array
 
 (** {2 Local structure} *)
 
+(** Access the input/output/both faces or cofaces of a given element. *)
 val faces_of : sign -> t -> dim:int -> pos:int -> intset
 
-(** Access the input/output/both faces or cofaces of a given element. *)
 val cofaces_of : sign -> t -> dim:int -> pos:int -> intset
 
 (** {2 Embeddings (morphisms of ogposets)} *)
@@ -46,30 +48,18 @@ module Embedding : sig
   val dom : t -> poset
   val cod : t -> poset
   val map : t -> int array array
+  val empty : poset -> t
   val id : poset -> t
   val compose : t -> t -> t
 end
 
-(** {2 Universal constructions} *)
+(** {2 Boundary operations} *)
 
-type coproduct = { sum: t; inl: Embedding.t; inr: Embedding.t }
+(* extremal `Input k g` = k-cells with no output cofaces, extremal `Output k g`
+   = k-cells with no input cofaces, extremal `Both k g` = union of the two *)
+val extremal : sign -> int -> t -> intset
+val maximal : int -> t -> intset
 
-val coproduct : t -> t -> coproduct
-
-type pushout = { po: t; leg1: Embedding.t; leg2: Embedding.t }
-
-val pushout : Embedding.t -> Embedding.t -> pushout
-
-type coequaliser = { coeq: t; emb: Embedding.t }
-
-val coequaliser : Embedding.t -> Embedding.t -> coequaliser
-
-(** {2 Derived substructures} *)
-
-(** [boundary sign at_dim X] is the induced sub-ogposet on the downward closure
-    of those [at_dim]-cells of [X] having no cofaces of the given orientation,
-    together with its inclusion embedding. *)
+(** [boundary sign at_dim X] is the appropriate boundary of X as an ogposet,
+    together with its embedding into X *)
 val boundary : sign -> int -> t -> t * Embedding.t
-
-(** [boundary_top sign X] = [boundary sign (dim X - 1) X]. *)
-val boundary_top : sign -> t -> t * Embedding.t
