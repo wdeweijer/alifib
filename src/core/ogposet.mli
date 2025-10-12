@@ -36,6 +36,7 @@ val sizes : t -> int array
 val faces_of : sign -> t -> dim:int -> pos:int -> intset
 
 val cofaces_of : sign -> t -> dim:int -> pos:int -> intset
+val equal : t -> t -> bool
 
 (** {2 Embeddings} *)
 
