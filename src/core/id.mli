@@ -8,3 +8,23 @@ val compare : t -> t -> int
 val hash : t -> int
 val to_int : t -> int
 val pp : Format.formatter -> t -> unit
+
+(** {2 Human-readable names} *)
+
+module Name : sig
+  type simple
+  type t
+
+  val simple : string -> (simple, string) result
+  val simple_to_string : simple -> string
+  val make : string -> (t, string) result
+  val to_string : t -> string
+end
+
+(** {2 Tags} *)
+
+type tag = [ `Local of Name.t | `Global of t ]
+
+val tag_equal : tag -> tag -> bool
+val tag_compare : tag -> tag -> int
+val tag_pp : Format.formatter -> tag -> unit
