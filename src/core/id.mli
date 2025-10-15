@@ -11,13 +11,11 @@ val pp : Format.formatter -> t -> unit
 
 (** {2 Human-readable names} *)
 
-type error = {
-  message: string;
-  notes: string list;
-}
+type error = { message: string; notes: string list }
 
 val error : ?notes:string list -> string -> error
 val pp_error : Format.formatter -> error -> unit
+
 type 'a checked = ('a, error) result
 
 module Name : sig

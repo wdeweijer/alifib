@@ -30,6 +30,15 @@ let sizes x = Array.init (x.dim + 1) (fun d -> Array.length x.faces_in.(d))
 let make ~dim ~faces_in ~faces_out ~cofaces_in ~cofaces_out =
   { dim; faces_in; faces_out; cofaces_in; cofaces_out }
 
+let intset_empty = IntSet.empty
+let intset_add x s = IntSet.add x s
+
+let intset_of_list lst =
+  List.fold_left (fun acc x -> IntSet.add x acc) IntSet.empty lst
+
+let intset_of_array arr =
+  Array.fold_left (fun acc x -> IntSet.add x acc) IntSet.empty arr
+
 let empty =
   {
     dim= -1;

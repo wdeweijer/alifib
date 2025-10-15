@@ -27,6 +27,10 @@ val make :
   cofaces_out:intset array array ->
   t
 
+val intset_empty : intset
+val intset_add : int -> intset -> intset
+val intset_of_list : int list -> intset
+val intset_of_array : int array -> intset
 val empty : t
 val point : t
 val dim : t -> int
@@ -70,6 +74,7 @@ val is_round : t -> bool
 (** [boundary sign at_dim X] is the embedding of the appropriate boundary of X
     into it *)
 val boundary : sign -> int -> t -> t * Embedding.t
+
 val traverse : t -> (int * intset) list -> t * Embedding.t
 
 (** {2 Pushouts} *)

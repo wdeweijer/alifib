@@ -12,20 +12,18 @@ let hash = Hashtbl.hash
 let to_int x = x
 let pp fmt x = Format.fprintf fmt "#%d" x
 
-type error = {
-  message: string;
-  notes: string list;
-}
+type error = { message: string; notes: string list }
 
 let error ?(notes = []) message = { message; notes }
 
 let pp_error fmt { message; notes } =
   let open Format in
-  fprintf fmt "%s" message;
-  (match notes with
-  | [] -> ()
-  | _ ->
-      List.iter (fun note -> fprintf fmt "@.@[<2>note:@ %s@]" note) notes)
+  fprintf fmt "%s" message
+  ; match notes with
+    | [] ->
+        ()
+    | _ ->
+        List.iter (fun note -> fprintf fmt "@.@[<2>note:@ %s@]" note) notes
 
 type 'a checked = ('a, error) result
 
@@ -42,13 +40,11 @@ module Name = struct
         false
 
   let check_simple s =
-    if String.length s = 0 then
-      Error (error "name must not be empty")
+    if String.length s = 0 then Error (error "name must not be empty")
     else if List.exists (String.equal s) reserved then
       Error (error ("name is reserved: " ^ s))
     else if String.for_all is_valid_char s then Ok s
-    else
-      Error (error "name contains invalid characters")
+    else Error (error "name contains invalid characters")
 
   let simple s = check_simple s
   let simple_to_string s = s
@@ -71,9 +67,7 @@ module Name = struct
               | Error _ as e ->
                   e)
         in
-        match validate [] parts with
-        | Ok _ -> Ok s
-        | Error err -> Error err
+        match validate [] parts with Ok _ -> Ok s | Error err -> Error err
 
   let make s = check_name s
   let to_string n = n
