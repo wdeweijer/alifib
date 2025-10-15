@@ -18,4 +18,5 @@ type 'a checked = ('a, error) result
 
 (** {2 Constructors} *)
 val cell0 : Id.tag -> t checked
+
 val cellN : Id.tag -> t -> t -> t checked

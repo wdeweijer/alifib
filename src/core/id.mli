@@ -35,3 +35,5 @@ type tag = [ `Local of Name.t | `Global of t ]
 val tag_equal : tag -> tag -> bool
 val tag_compare : tag -> tag -> int
 val tag_pp : Format.formatter -> tag -> unit
+val tag_local : Name.t -> tag
+val tag_global : t -> tag

@@ -100,3 +100,6 @@ let tag_pp fmt = function
       Format.fprintf fmt "%s" (Name.to_string name)
   | `Global id ->
       pp fmt id
+
+let tag_local name = `Local name
+let tag_global id = `Global id
