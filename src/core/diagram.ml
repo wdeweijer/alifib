@@ -223,3 +223,41 @@ let paste n u v =
               base_labels
           in
           Ok { shape= shape_uv; labels= labels_uv }
+
+let boundary sign k d =
+  let _, emb = Ogposet.boundary sign k d.shape in
+  pullback d emb
+
+let label_set_of d =
+  let table = Hashtbl.create 16 in
+  Array.iter
+    (Array.iter (fun tag ->
+         let count =
+           match Hashtbl.find_opt table tag with Some c -> c + 1 | None -> 1
+         in
+         Hashtbl.replace table tag count))
+    d.labels
+  ; Hashtbl.fold (fun tag count acc -> (tag, count) :: acc) table []
+    |> List.sort (fun (a, _) (b, _) -> Id.tag_compare a b)
+
+let equal u v =
+  if u == v then true
+  else
+    let shape_u = u.shape and shape_v = v.shape in
+    let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
+    if dim_u <> dim_v then false
+    else
+      let n = dim_u in
+      let sizes_u = Ogposet.sizes shape_u and sizes_v = Ogposet.sizes shape_v in
+      if sizes_u <> sizes_v then false
+      else if label_set_of u <> label_set_of v then false
+      else if Ogposet.equal shape_u shape_v then labels_equal u.labels v.labels
+      else
+        let stack_u = build_stack_paste `Input shape_u n in
+        let stack_v = build_stack_paste `Input shape_v n in
+        let u', e_u = Ogposet.traverse shape_u stack_u in
+        let v', e_v = Ogposet.traverse shape_v stack_v in
+        if not (Ogposet.equal u' v') then false
+        else
+          let pb_u = pullback u e_u and pb_v = pullback v e_v in
+          labels_equal pb_u.labels pb_v.labels

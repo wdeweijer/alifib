@@ -21,3 +21,9 @@ val cell0 : Id.tag -> t checked
 
 val cellN : Id.tag -> t -> t -> t checked
 val paste : int -> t -> t -> t checked
+
+(** {2 Derived operations} *)
+val boundary : Ogposet.sign -> int -> t -> t
+
+val label_set_of : t -> (Id.tag * int) list
+val equal : t -> t -> bool
