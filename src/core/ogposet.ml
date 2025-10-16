@@ -153,6 +153,26 @@ let set_filter_map f s =
     (fun x acc -> match f x with None -> acc | Some y -> IntSet.add y acc)
     s IntSet.empty
 
+let remap_adjacency ~(levels : int) ~(forward : int array array)
+    ~(inv_dom : int array array) ~(shift : int) (adj : adjacency) : adjacency =
+  let empty = IntSet.empty in
+  Array.init levels (fun j ->
+      let nj = Array.length forward.(j) in
+      if (shift = -1 && j = 0) || (shift = 1 && j = levels - 1) then
+        Array.make nj empty
+      else
+        Array.init nj (fun i ->
+            let old = forward.(j).(i) in
+            let target_dim = j + shift in
+            if shift = -1 then
+              set_map (fun x -> inv_dom.(target_dim).(x)) adj.(j).(old)
+            else
+              set_filter_map
+                (fun x ->
+                  let y = inv_dom.(target_dim).(x) in
+                  if y < 0 then None else Some y)
+                adj.(j).(old)))
+
 (* --- Boundary --------------------------------------------------------- *)
 
 let extremal (s : sign) (k : int) (g : t) : intset =
@@ -309,39 +329,20 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
 
       let ed : embedding_data = { forward; inv_dom } in
 
-      (* Local helper: remap an adjacency family using the already-built maps. -
-         shift = -1 → faces (use set_map; all targets are guaranteed present) -
-         shift = +1 → cofaces (use set_filter_map; some targets may be
-         absent) *)
-      let build_adj (adj : adjacency) (shift : int) : adjacency =
-        let empty = IntSet.empty in
-        Array.init dims_b (fun j ->
-            let nj = Array.length ed.forward.(j) in
-            if (shift = -1 && j = 0) || (shift = 1 && j = dims_b - 1) then
-              Array.make nj empty
-            else
-              Array.init nj (fun i ->
-                  let old = ed.forward.(j).(i) in
-                  let target_dim = j + shift in
-                  if shift = -1 then
-                    (* faces: every referenced face must be in the boundary by
-                       construction *)
-                    set_map (fun x -> ed.inv_dom.(target_dim).(x)) adj.(j).(old)
-                  else
-                    (* cofaces: may reference cells outside the boundary; filter
-                       those out *)
-                    set_filter_map
-                      (fun x ->
-                        let y = ed.inv_dom.(target_dim).(x) in
-                        if y < 0 then None else Some y)
-                      adj.(j).(old)))
+      (* Build boundary adjacencies using the shared helper. *)
+      let faces_in' =
+        remap_adjacency ~levels:dims_b ~forward:ed.forward ~inv_dom:ed.inv_dom
+          ~shift:(-1) g.faces_in
+      and faces_out' =
+        remap_adjacency ~levels:dims_b ~forward:ed.forward ~inv_dom:ed.inv_dom
+          ~shift:(-1) g.faces_out
+      and cofaces_in' =
+        remap_adjacency ~levels:dims_b ~forward:ed.forward ~inv_dom:ed.inv_dom
+          ~shift:1 g.cofaces_in
+      and cofaces_out' =
+        remap_adjacency ~levels:dims_b ~forward:ed.forward ~inv_dom:ed.inv_dom
+          ~shift:1 g.cofaces_out
       in
-
-      (* Build boundary adjacencies using the local helper. *)
-      let faces_in' = build_adj g.faces_in (-1)
-      and faces_out' = build_adj g.faces_out (-1)
-      and cofaces_in' = build_adj g.cofaces_in 1
-      and cofaces_out' = build_adj g.cofaces_out 1 in
 
       (* Assemble boundary ogposet and inclusion embedding *)
       let sub =
@@ -477,31 +478,19 @@ let traverse (g : t) (initial_stack : (int * intset) list) : t * Embedding.t =
         ; let ed =
             { forward= map; inv_dom= Array.init map_levels (fun d -> inv.(d)) }
           in
-          let build_adj adj shift =
-            let empty_set = IntSet.empty in
-            Array.init map_levels (fun j ->
-                let nj = Array.length ed.forward.(j) in
-                if (shift = -1 && j = 0) || (shift = 1 && j = map_levels - 1)
-                then Array.make nj empty_set
-                else
-                  Array.init nj (fun i ->
-                      let old = ed.forward.(j).(i) in
-                      let target_dim = j + shift in
-                      if shift = -1 then
-                        set_map
-                          (fun x -> ed.inv_dom.(target_dim).(x))
-                          adj.(j).(old)
-                      else
-                        set_filter_map
-                          (fun x ->
-                            let y = ed.inv_dom.(target_dim).(x) in
-                            if y < 0 then None else Some y)
-                          adj.(j).(old)))
+          let faces_in' =
+            remap_adjacency ~levels:map_levels ~forward:ed.forward
+              ~inv_dom:ed.inv_dom ~shift:(-1) g.faces_in
+          and faces_out' =
+            remap_adjacency ~levels:map_levels ~forward:ed.forward
+              ~inv_dom:ed.inv_dom ~shift:(-1) g.faces_out
+          and cofaces_in' =
+            remap_adjacency ~levels:map_levels ~forward:ed.forward
+              ~inv_dom:ed.inv_dom ~shift:1 g.cofaces_in
+          and cofaces_out' =
+            remap_adjacency ~levels:map_levels ~forward:ed.forward
+              ~inv_dom:ed.inv_dom ~shift:1 g.cofaces_out
           in
-          let faces_in' = build_adj g.faces_in (-1)
-          and faces_out' = build_adj g.faces_out (-1)
-          and cofaces_in' = build_adj g.cofaces_in 1
-          and cofaces_out' = build_adj g.cofaces_out 1 in
           let dom =
             {
               dim= max_dim;
