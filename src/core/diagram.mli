@@ -20,3 +20,4 @@ type 'a checked = ('a, error) result
 val cell0 : Id.tag -> t checked
 
 val cellN : Id.tag -> t -> t -> t checked
+val paste : int -> t -> t -> t checked

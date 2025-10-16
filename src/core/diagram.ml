@@ -24,7 +24,7 @@ let cell0 tag =
   let labels = [| [| tag |] |] in
   Ok { shape; labels }
 
-let[@warning "-32"] pullback d emb =
+let pullback d emb =
   let dom = Ogposet.Embedding.dom emb in
   let cod_labels = labels d in
   let map = Ogposet.Embedding.map emb in
@@ -67,6 +67,13 @@ let build_stack shape =
   let inputs = gather [] (d - 1) in
   if d > 0 then inputs @ [ (d - 1, Ogposet.extremal `Output (d - 1) shape) ]
   else inputs
+
+let build_extremal_sequence sign shape =
+  let rec aux acc k =
+    if k < 0 then acc
+    else aux ((k, Ogposet.extremal sign k shape) :: acc) (k - 1)
+  in
+  aux [] (Ogposet.dim shape) |> List.rev
 
 let cellN tag u v =
   let shape_u = shape u and shape_v = shape v in
@@ -166,5 +173,52 @@ let cellN tag u v =
           let labels_uv =
             Array.init (d + 2) (fun dim ->
                 if dim <= d then labels_bd.(dim) else [| tag |])
+          in
+          Ok { shape= shape_uv; labels= labels_uv }
+
+let paste n u v =
+  if n < 0 then Error (error "dimension of pasting must be positive")
+  else
+    let shape_u = shape u and shape_v = shape v in
+    let stack_u = build_extremal_sequence `Output shape_u in
+    let stack_v = build_extremal_sequence `Input shape_v in
+    let out_n_u, e_u = Ogposet.traverse shape_u stack_u in
+    let in_n_v, e_v = Ogposet.traverse shape_v stack_v in
+    if not (Ogposet.equal out_n_u in_n_v) then
+      Error (error "shapes of boundaries do not match")
+    else
+      let pb_u = pullback u e_u and pb_v = pullback v e_v in
+      if not (labels_equal pb_u.labels pb_v.labels) then
+        Error (error "boundaries do not match")
+      else
+        let { Ogposet.tip= shape_uv; inl; inr } = Ogposet.pushout e_u e_v in
+        let sizes_uv = Ogposet.sizes shape_uv in
+        let labels_u = labels u and labels_v = labels v in
+        let base_labels =
+          Array.init (Array.length sizes_uv) (fun dim ->
+              Array.make sizes_uv.(dim) None)
+        in
+        Array.iteri
+          (fun dim mapping ->
+            Array.iteri
+              (fun idx target ->
+                base_labels.(dim).(target) <- Some labels_u.(dim).(idx))
+              mapping)
+          (Ogposet.Embedding.map inl)
+        ; Array.iteri
+            (fun dim mapping ->
+              Array.iteri
+                (fun idx target ->
+                  base_labels.(dim).(target) <- Some labels_v.(dim).(idx))
+                mapping)
+            (Ogposet.Embedding.map inr)
+        ; let labels_uv =
+            Array.map
+              (Array.map (function
+                | Some tag_value ->
+                    tag_value
+                | None ->
+                    assert false))
+              base_labels
           in
           Ok { shape= shape_uv; labels= labels_uv }
