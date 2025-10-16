@@ -56,7 +56,7 @@ let labels_equal a b =
   in
   dim_loop 0
 
-let build_stack shape =
+let build_stack_cellN shape =
   let d = Ogposet.dim shape in
   let rec gather acc k =
     if k < 0 then acc
@@ -68,12 +68,12 @@ let build_stack shape =
   if d > 0 then inputs @ [ (d - 1, Ogposet.extremal `Output (d - 1) shape) ]
   else inputs
 
-let build_extremal_sequence sign shape =
+let build_stack_paste sign shape max_dim =
   let rec aux acc k =
     if k < 0 then acc
     else aux ((k, Ogposet.extremal sign k shape) :: acc) (k - 1)
   in
-  aux [] (Ogposet.dim shape) |> List.rev
+  aux [] max_dim |> List.rev
 
 let cellN tag u v =
   let shape_u = shape u and shape_v = shape v in
@@ -83,8 +83,8 @@ let cellN tag u v =
   else if not (is_round v) then Error (error "v is not round")
   else
     let d = dim_u in
-    let bd_u, e_u = Ogposet.traverse shape_u (build_stack shape_u) in
-    let bd_v, e_v = Ogposet.traverse shape_v (build_stack shape_v) in
+    let bd_u, e_u = Ogposet.traverse shape_u (build_stack_cellN shape_u) in
+    let bd_v, e_v = Ogposet.traverse shape_v (build_stack_cellN shape_v) in
     if not (Ogposet.equal bd_u bd_v) then
       Error (error "shapes of boundaries do not match")
     else
@@ -180,8 +180,9 @@ let paste n u v =
   if n < 0 then Error (error "dimension of pasting must be positive")
   else
     let shape_u = shape u and shape_v = shape v in
-    let stack_u = build_extremal_sequence `Output shape_u in
-    let stack_v = build_extremal_sequence `Input shape_v in
+    let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
+    let stack_u = build_stack_paste `Output shape_u (min n dim_u) in
+    let stack_v = build_stack_paste `Input shape_v (min n dim_v) in
     let out_n_u, e_u = Ogposet.traverse shape_u stack_u in
     let in_n_v, e_v = Ogposet.traverse shape_v stack_v in
     if not (Ogposet.equal out_n_u in_n_v) then
