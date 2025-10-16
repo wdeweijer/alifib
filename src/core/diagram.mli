@@ -27,3 +27,4 @@ val boundary : Ogposet.sign -> int -> t -> t
 
 val label_set_of : t -> (Id.tag * int) list
 val equal : t -> t -> bool
+val isomorphism_of : t -> t -> Ogposet.Embedding.t checked
