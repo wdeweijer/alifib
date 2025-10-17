@@ -1,18 +1,6 @@
-type t = { shape: Ogposet.t; labels: Id.tag array array }
-type error = { message: string; notes: string list }
-
-let error ?(notes = []) message = { message; notes }
-
-let pp_error fmt { message; notes } =
-  let open Format in
-  fprintf fmt "%s" message
-  ; match notes with
-    | [] ->
-        ()
-    | _ ->
-        List.iter (fun note -> fprintf fmt "@.@[<2>note:@ %s@]" note) notes
-
-type 'a checked = ('a, error) result
+type t = { shape: Ogposet.t; labels: Id.Tag.t array array }
+type error = Error.t
+type 'a checked = 'a Error.checked
 
 let shape d = d.shape
 let labels d = d.labels
@@ -78,19 +66,19 @@ let build_stack_paste sign shape max_dim =
 let cellN tag u v =
   let shape_u = shape u and shape_v = shape v in
   let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
-  if dim_u <> dim_v then Error (error "dimensions do not match")
-  else if not (is_round u) then Error (error "u is not round")
-  else if not (is_round v) then Error (error "v is not round")
+  if dim_u <> dim_v then Error (Error.make "dimensions do not match")
+  else if not (is_round u) then Error (Error.make "u is not round")
+  else if not (is_round v) then Error (Error.make "v is not round")
   else
     let d = dim_u in
     let bd_u, e_u = Ogposet.traverse shape_u (build_stack_cellN shape_u) in
     let bd_v, e_v = Ogposet.traverse shape_v (build_stack_cellN shape_v) in
     if not (Ogposet.equal bd_u bd_v) then
-      Error (error "shapes of boundaries do not match")
+      Error (Error.make "shapes of boundaries do not match")
     else
       let pb_u = pullback u e_u and pb_v = pullback v e_v in
       if not (labels_equal pb_u.labels pb_v.labels) then
-        Error (error "boundaries do not match")
+        Error (Error.make "boundaries do not match")
       else
         let { Ogposet.tip= bd_uv; inl; inr } = Ogposet.pushout e_u e_v in
         let sizes_bd = Ogposet.sizes bd_uv in
@@ -177,7 +165,7 @@ let cellN tag u v =
           Ok { shape= shape_uv; labels= labels_uv }
 
 let paste n u v =
-  if n < 0 then Error (error "dimension of pasting must be positive")
+  if n < 0 then Error (Error.make "dimension of pasting must be positive")
   else
     let shape_u = shape u and shape_v = shape v in
     let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
@@ -186,11 +174,11 @@ let paste n u v =
     let out_n_u, e_u = Ogposet.traverse shape_u stack_u in
     let in_n_v, e_v = Ogposet.traverse shape_v stack_v in
     if not (Ogposet.equal out_n_u in_n_v) then
-      Error (error "shapes of boundaries do not match")
+      Error (Error.make "shapes of boundaries do not match")
     else
       let pb_u = pullback u e_u and pb_v = pullback v e_v in
       if not (labels_equal pb_u.labels pb_v.labels) then
-        Error (error "boundaries do not match")
+        Error (Error.make "boundaries do not match")
       else
         let { Ogposet.tip= shape_uv; inl; inr } = Ogposet.pushout e_u e_v in
         let sizes_uv = Ogposet.sizes shape_uv in
@@ -238,7 +226,7 @@ let label_set_of d =
          Hashtbl.replace table tag count))
     d.labels
   ; Hashtbl.fold (fun tag count acc -> (tag, count) :: acc) table []
-    |> List.sort (fun (a, _) (b, _) -> Id.tag_compare a b)
+    |> List.sort (fun (a, _) (b, _) -> Id.Tag.compare a b)
 
 let equal u v =
   if u == v then true
@@ -304,24 +292,24 @@ let isomorphism_of u v =
   if u == v then Ok (identity_embedding ())
   else
     let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
-    if dim_u <> dim_v then Error (error "dimensions do not match")
+    if dim_u <> dim_v then Error (Error.make "dimensions do not match")
     else
       let sizes_u = Ogposet.sizes shape_u and sizes_v = Ogposet.sizes shape_v in
-      if sizes_u <> sizes_v then Error (error "shapes do not match")
+      if sizes_u <> sizes_v then Error (Error.make "shapes do not match")
       else if label_set_of u <> label_set_of v then
-        Error (error "labels do not match")
+        Error (Error.make "labels do not match")
       else if Ogposet.equal shape_u shape_v then
         if labels_equal u.labels v.labels then Ok (identity_embedding ())
-        else Error (error "labels do not match")
+        else Error (Error.make "labels do not match")
       else
         let n = dim_u in
         let stack_u = build_stack_paste `Input shape_u n
         and stack_v = build_stack_paste `Input shape_v n in
         let u', e_u = Ogposet.traverse shape_u stack_u
         and v', e_v = Ogposet.traverse shape_v stack_v in
-        if not (Ogposet.equal u' v') then Error (error "shapes do not match")
+        if not (Ogposet.equal u' v') then Error (Error.make "shapes do not match")
         else
           let pb_u = pullback u e_u and pb_v = pullback v e_v in
           if not (labels_equal pb_u.labels pb_v.labels) then
-            Error (error "labels do not match")
+            Error (Error.make "labels do not match")
           else compose_from_traversals e_u e_v

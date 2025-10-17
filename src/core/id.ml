@@ -1,33 +1,23 @@
-type t = int
+type error = Error.t
+type 'a checked = 'a Error.checked
 
-let counter = ref 0
+module Global = struct
+  type t = int
 
-let fresh () =
-  let i = !counter in
-  incr counter ; i
+  let counter = ref 0
 
-let equal = Int.equal
-let compare = Int.compare
-let hash = Hashtbl.hash
-let to_int x = x
-let pp fmt x = Format.fprintf fmt "#%d" x
+  let fresh () =
+    let i = !counter in
+    incr counter ; i
 
-type error = { message: string; notes: string list }
+  let equal = Int.equal
+  let compare = Int.compare
+  let hash = Hashtbl.hash
+  let to_int x = x
+  let pp fmt x = Format.fprintf fmt "#%d" x
+end
 
-let error ?(notes = []) message = { message; notes }
-
-let pp_error fmt { message; notes } =
-  let open Format in
-  fprintf fmt "%s" message
-  ; match notes with
-    | [] ->
-        ()
-    | _ ->
-        List.iter (fun note -> fprintf fmt "@.@[<2>note:@ %s@]" note) notes
-
-type 'a checked = ('a, error) result
-
-module Name = struct
+module Local = struct
   type simple = string
   type t = string
 
@@ -40,22 +30,22 @@ module Name = struct
         false
 
   let check_simple s =
-    if String.length s = 0 then Error (error "name must not be empty")
+    if String.length s = 0 then Error (Error.make "name must not be empty")
     else if List.exists (String.equal s) reserved then
-      Error (error ("name is reserved: " ^ s))
+      Error (Error.make ("name is reserved: " ^ s))
     else if String.for_all is_valid_char s then Ok s
-    else Error (error "name contains invalid characters")
+    else Error (Error.make "name contains invalid characters")
 
   let simple s = check_simple s
   let simple_to_string s = s
   let string_is_empty s = String.length s = 0
 
   let check_name s =
-    if String.length s = 0 then Error (error "name must not be empty")
+    if String.length s = 0 then Error (Error.make "name must not be empty")
     else
       let parts = String.split_on_char '.' s in
       if List.exists string_is_empty parts then
-        Error (error "name must not contain empty segments")
+        Error (Error.make "name must not contain empty segments")
       else
         let rec validate acc = function
           | [] ->
@@ -73,33 +63,35 @@ module Name = struct
   let to_string n = n
 end
 
-type tag = [ `Local of Name.t | `Global of t ]
+module Tag = struct
+  type t = [ `Local of Local.t | `Global of Global.t ]
 
-let tag_equal a b =
-  match (a, b) with
-  | `Local x, `Local y ->
-      String.equal x y
-  | `Global x, `Global y ->
-      equal x y
-  | (`Local _ | `Global _), _ ->
-      false
+  let equal a b =
+    match (a, b) with
+    | `Local x, `Local y ->
+        String.equal x y
+    | `Global x, `Global y ->
+        Global.equal x y
+    | (`Local _ | `Global _), _ ->
+        false
 
-let tag_compare a b =
-  match (a, b) with
-  | `Local x, `Local y ->
-      String.compare x y
-  | `Global x, `Global y ->
-      compare x y
-  | `Local _, `Global _ ->
-      -1
-  | `Global _, `Local _ ->
-      1
+  let compare a b =
+    match (a, b) with
+    | `Local x, `Local y ->
+        String.compare x y
+    | `Global x, `Global y ->
+        Global.compare x y
+    | `Local _, `Global _ ->
+        -1
+    | `Global _, `Local _ ->
+        1
 
-let tag_pp fmt = function
-  | `Local name ->
-      Format.fprintf fmt "%s" (Name.to_string name)
-  | `Global id ->
-      pp fmt id
+  let pp fmt = function
+    | `Local name ->
+        Format.fprintf fmt "%s" (Local.to_string name)
+    | `Global id ->
+        Global.pp fmt id
 
-let tag_local name = `Local name
-let tag_global id = `Global id
+  let of_local name = `Local name
+  let of_global id = `Global id
+end
