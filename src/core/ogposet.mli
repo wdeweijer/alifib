@@ -14,6 +14,10 @@ type poset = t
 (** Abstract type of sets of integers used for faces and cofaces. *)
 type intset
 
+(** {2 Error handling} *)
+type error = Error.t
+type 'a checked = 'a Error.checked
+
 (** Orientation: input, output, or both. *)
 type sign = [ `Input | `Output | `Both ]
 
@@ -67,6 +71,7 @@ val extremal : sign -> int -> t -> intset
 
 val maximal : int -> t -> intset
 val is_pure : t -> bool
+val is_atom : t -> bool
 
 (** roundness predicate; to be run exclusively on molecules *)
 val is_round : t -> bool
@@ -76,6 +81,8 @@ val is_round : t -> bool
 val boundary : sign -> int -> t -> t * Embedding.t
 
 val traverse : t -> (int * intset) list -> t * Embedding.t
+val isomorphic : t -> t -> bool
+val isomorphism_of : t -> t -> Embedding.t checked
 
 (** {2 Pushouts} *)
 

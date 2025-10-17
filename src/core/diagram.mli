@@ -22,5 +22,7 @@ val paste : int -> t -> t -> t checked
 val boundary : Ogposet.sign -> int -> t -> t
 
 val label_set_of : t -> (Id.Tag.t * int) list
+val isomorphic : t -> t -> bool
 val equal : t -> t -> bool
 val isomorphism_of : t -> t -> Ogposet.Embedding.t checked
+val is_cell : t -> bool

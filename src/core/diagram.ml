@@ -6,6 +6,7 @@ let shape d = d.shape
 let labels d = d.labels
 let dim d = Ogposet.dim d.shape
 let is_round d = Ogposet.is_round d.shape
+let is_cell d = Ogposet.is_atom d.shape
 
 let cell0 tag =
   let shape = Ogposet.point in
@@ -231,85 +232,27 @@ let label_set_of d =
 let equal u v =
   if u == v then true
   else
+    Ogposet.equal u.shape v.shape && labels_equal u.labels v.labels
+
+let isomorphic u v =
+  if equal u v then true
+  else
     let shape_u = u.shape and shape_v = v.shape in
-    let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
-    if dim_u <> dim_v then false
-    else
-      let n = dim_u in
-      let sizes_u = Ogposet.sizes shape_u and sizes_v = Ogposet.sizes shape_v in
-      if sizes_u <> sizes_v then false
-      else if label_set_of u <> label_set_of v then false
-      else if Ogposet.equal shape_u shape_v then labels_equal u.labels v.labels
-      else
-        let stack_u = build_stack_paste `Input shape_u n in
-        let stack_v = build_stack_paste `Input shape_v n in
-        let u', e_u = Ogposet.traverse shape_u stack_u in
-        let v', e_v = Ogposet.traverse shape_v stack_v in
-        if not (Ogposet.equal u' v') then false
-        else
-          let pb_u = pullback u e_u and pb_v = pullback v e_v in
-          labels_equal pb_u.labels pb_v.labels
+    match Ogposet.isomorphism_of shape_u shape_v with
+    | Error _ ->
+        false
+    | Ok iso ->
+        let pulled = pullback v iso in
+        labels_equal u.labels pulled.labels
 
 let isomorphism_of u v =
   let shape_u = u.shape and shape_v = v.shape in
-  let identity_embedding () =
-    let sizes_dom = Ogposet.sizes shape_u
-    and sizes_cod = Ogposet.sizes shape_v in
-    let map =
-      Array.mapi (fun _ size -> Array.init size (fun idx -> idx)) sizes_dom
-    in
-    let inv =
-      Array.mapi (fun _ size -> Array.init size (fun idx -> idx)) sizes_cod
-    in
-    Ogposet.Embedding.make ~dom:shape_u ~cod:shape_v ~map ~inv
-  in
-  let compose_from_traversals e_u e_v =
-    let dom = shape_u and cod = shape_v in
-    let inv_u = Ogposet.Embedding.inv e_u
-    and map_u = Ogposet.Embedding.map e_u
-    and map_v = Ogposet.Embedding.map e_v
-    and inv_v = Ogposet.Embedding.inv e_v in
-    let map =
-      Array.mapi
-        (fun dim inv_level ->
-          let map_v_level = map_v.(dim) in
-          Array.init (Array.length inv_level) (fun idx ->
-              let mid = inv_level.(idx) in
-              map_v_level.(mid)))
-        inv_u
-    in
-    let inv =
-      Array.mapi
-        (fun dim inv_level ->
-          let map_u_level = map_u.(dim) in
-          Array.init (Array.length inv_level) (fun idx ->
-              let mid = inv_level.(idx) in
-              map_u_level.(mid)))
-        inv_v
-    in
-    Ok (Ogposet.Embedding.make ~dom ~cod ~map ~inv)
-  in
-  if u == v then Ok (identity_embedding ())
+  if u == v then Ok (Ogposet.Embedding.id shape_u)
   else
-    let dim_u = Ogposet.dim shape_u and dim_v = Ogposet.dim shape_v in
-    if dim_u <> dim_v then Error (Error.make "dimensions do not match")
-    else
-      let sizes_u = Ogposet.sizes shape_u and sizes_v = Ogposet.sizes shape_v in
-      if sizes_u <> sizes_v then Error (Error.make "shapes do not match")
-      else if label_set_of u <> label_set_of v then
-        Error (Error.make "labels do not match")
-      else if Ogposet.equal shape_u shape_v then
-        if labels_equal u.labels v.labels then Ok (identity_embedding ())
+    match Ogposet.isomorphism_of shape_u shape_v with
+    | Error _ as err ->
+        err
+    | Ok iso ->
+        let pulled = pullback v iso in
+        if labels_equal u.labels pulled.labels then Ok iso
         else Error (Error.make "labels do not match")
-      else
-        let n = dim_u in
-        let stack_u = build_stack_paste `Input shape_u n
-        and stack_v = build_stack_paste `Input shape_v n in
-        let u', e_u = Ogposet.traverse shape_u stack_u
-        and v', e_v = Ogposet.traverse shape_v stack_v in
-        if not (Ogposet.equal u' v') then Error (Error.make "shapes do not match")
-        else
-          let pb_u = pullback u e_u and pb_v = pullback v e_v in
-          if not (labels_equal pb_u.labels pb_v.labels) then
-            Error (Error.make "labels do not match")
-          else compose_from_traversals e_u e_v

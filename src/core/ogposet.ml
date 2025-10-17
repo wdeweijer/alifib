@@ -23,6 +23,8 @@ type t = {
 }
 
 type poset = t
+type error = Error.t
+type 'a checked = 'a Error.checked
 
 let dim x = x.dim
 let sizes x = Array.init (x.dim + 1) (fun d -> Array.length x.faces_in.(d))
@@ -220,6 +222,18 @@ let is_pure (g : t) : bool =
     in
     aux 0
 
+let is_atom (g : t) : bool =
+  is_pure g &&
+  let sz = sizes g in
+  let top = g.dim in
+  if top < 0 then false else sz.(top) = 1
+
+let stack_extremal sign shape =
+  let rec aux acc k =
+    if k < 0 then acc else aux ((k, extremal sign k shape) :: acc) (k - 1)
+  in
+  aux [] (dim shape)
+
 let is_round (g : t) : bool =
   let n = g.dim in
   if n <= 1 then true
@@ -272,6 +286,7 @@ let is_round (g : t) : bool =
             ; step (j + 1))
       in
       step 0
+
 
 type embedding_data = {
   forward: int array array; (* boundary index -> original index in g *)
@@ -475,7 +490,7 @@ let traverse (g : t) (initial_stack : (int * intset) list) : t * Embedding.t =
                           loop rest))
         in
         loop initial_stack
-        ; let ed =
+      ; let ed =
             { forward= map; inv_dom= Array.init map_levels (fun d -> inv.(d)) }
           in
           let faces_in' =
@@ -502,6 +517,76 @@ let traverse (g : t) (initial_stack : (int * intset) list) : t * Embedding.t =
           in
           let emb = Embedding.make ~dom ~cod:g ~map ~inv in
           (dom, emb)
+
+let isomorphism_of (u : t) (v : t) : Embedding.t checked =
+  let failure msg = Error (Error.make msg) in
+  if u == v then Ok (Embedding.id u)
+  else
+    let dim_u = dim u and dim_v = dim v in
+    if dim_u <> dim_v then failure "dimensions do not match"
+    else
+      let sizes_u = sizes u and sizes_v = sizes v in
+      if sizes_u <> sizes_v then failure "shapes do not match"
+      else if equal u v then (
+        let map =
+          Array.mapi (fun _ size -> Array.init size (fun idx -> idx)) sizes_u
+        in
+        let inv =
+          Array.mapi (fun _ size -> Array.init size (fun idx -> idx)) sizes_v
+        in
+        Ok (Embedding.make ~dom:u ~cod:v ~map ~inv))
+      else
+        let stack_u = stack_extremal `Input u
+        and stack_v = stack_extremal `Input v in
+        let u', e_u = traverse u stack_u
+        and v', e_v = traverse v stack_v in
+        if not (equal u' v') then failure "canonical forms do not match"
+        else
+          let compose () =
+            let inv_u = Embedding.inv e_u
+            and map_u = Embedding.map e_u
+            and map_v = Embedding.map e_v
+            and inv_v = Embedding.inv e_v in
+            let dims_dom = Array.length inv_u in
+            let dims_cod = Array.length inv_v in
+            if dims_dom <> Array.length map_v || dims_cod <> Array.length map_u
+            then failure "failed to compose isomorphism data"
+            else
+              let produce_rows inv_levels map_levels =
+                let dims = Array.length inv_levels in
+                let result = Array.make dims [||] in
+                let ok = ref true in
+                for dim = 0 to dims - 1 do
+                  if !ok then (
+                    let inv_level = inv_levels.(dim) in
+                    let map_level = map_levels.(dim) in
+                    let len = Array.length inv_level in
+                    let row = Array.make len (-1) in
+                    for idx = 0 to len - 1 do
+                      let mid = inv_level.(idx) in
+                      if mid < 0 || mid >= Array.length map_level then (
+                        ok := false )
+                      else row.(idx) <- map_level.(mid)
+                    done
+                    ; result.(dim) <- row )
+                done
+                ; if !ok then Ok result
+                  else failure "failed to compose isomorphism data"
+              in
+              match produce_rows inv_u map_v with
+              | Error _ as e ->
+                  e
+              | Ok map ->
+                  (match produce_rows inv_v map_u with
+                  | Error _ as e ->
+                      e
+                  | Ok inv ->
+                      Ok (Embedding.make ~dom:u ~cod:v ~map ~inv))
+          in
+          compose ()
+
+let isomorphic (u : t) (v : t) : bool =
+  match isomorphism_of u v with Ok _ -> true | Error _ -> false
 
 type pushout = { tip: t; inl: Embedding.t; inr: Embedding.t }
 
