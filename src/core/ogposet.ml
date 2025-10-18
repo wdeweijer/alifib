@@ -20,6 +20,7 @@ type t = {
   faces_out: adjacency;
   cofaces_in: adjacency;
   cofaces_out: adjacency;
+  normal: bool;
 }
 
 type poset = t
@@ -30,8 +31,9 @@ let dim x = x.dim
 let sizes x = Array.init (x.dim + 1) (fun d -> Array.length x.faces_in.(d))
 
 let make ~dim ~faces_in ~faces_out ~cofaces_in ~cofaces_out =
-  { dim; faces_in; faces_out; cofaces_in; cofaces_out }
+  { dim; faces_in; faces_out; cofaces_in; cofaces_out; normal= false }
 
+let is_normal g = g.normal
 let intset_empty = IntSet.empty
 let intset_add x s = IntSet.add x s
 
@@ -48,6 +50,7 @@ let empty =
     faces_out= [||];
     cofaces_in= [||];
     cofaces_out= [||];
+    normal= true;
   }
 
 let point =
@@ -58,6 +61,7 @@ let point =
     faces_out= [| make_level () |];
     cofaces_in= [| make_level () |];
     cofaces_out= [| make_level () |];
+    normal= true;
   }
 
 (* --- Accessors -------------------------------------------------------- *)
@@ -235,6 +239,23 @@ let stack_extremal sign shape =
   in
   aux [] (dim shape)
 
+let build_stack_paste sign shape max_dim =
+  let rec aux acc k =
+    if k < 0 then acc else aux ((k, extremal sign k shape) :: acc) (k - 1)
+  in
+  aux [] max_dim |> List.rev
+
+let build_stack_cellN shape =
+  let d = dim shape in
+  let rec gather acc k =
+    if k < 0 then acc
+    else
+      let set = extremal `Input k shape in
+      gather ((k, set) :: acc) (k - 1)
+  in
+  let inputs = gather [] (d - 1) in
+  if d > 0 then inputs @ [ (d - 1, extremal `Output (d - 1) shape) ] else inputs
+
 let is_round (g : t) : bool =
   let n = g.dim in
   if n <= 1 then true
@@ -367,6 +388,7 @@ let boundary (s : sign) (k : int) (g : t) : t * Embedding.t =
           faces_out= faces_out';
           cofaces_in= cofaces_in';
           cofaces_out= cofaces_out';
+          normal= false;
         }
       in
       let cod_inv =
@@ -513,10 +535,32 @@ let traverse (g : t) (initial_stack : (int * intset) list) : t * Embedding.t =
               faces_out= faces_out';
               cofaces_in= cofaces_in';
               cofaces_out= cofaces_out';
+              normal= false;
             }
           in
           let emb = Embedding.make ~dom ~cod:g ~map ~inv in
           (dom, emb)
+
+let normalisation g =
+  if is_normal g then (g, Embedding.id g)
+  else
+    let stack = stack_extremal `Input g in
+    let dom, emb = traverse g stack in
+    ({ dom with normal= true }, emb)
+
+let boundary_traverse sign k g =
+  match sign with
+  | `Input ->
+      let stack = build_stack_paste `Input g (min k (dim g)) in
+      let dom, emb = traverse g stack in
+      ({ dom with normal= true }, emb)
+  | `Output ->
+      let stack = build_stack_paste `Output g (min k (dim g)) in
+      let dom, emb = traverse g stack in
+      ({ dom with normal= true }, emb)
+  | `Both ->
+      let stack = build_stack_cellN g in
+      traverse g stack
 
 let isomorphism_of (u : t) (v : t) : Embedding.t checked =
   let failure msg = Error (Error.make msg) in
@@ -527,18 +571,9 @@ let isomorphism_of (u : t) (v : t) : Embedding.t checked =
     else
       let sizes_u = sizes u and sizes_v = sizes v in
       if sizes_u <> sizes_v then failure "shapes do not match"
-      else if equal u v then
-        let map =
-          Array.mapi (fun _ size -> Array.init size (fun idx -> idx)) sizes_u
-        in
-        let inv =
-          Array.mapi (fun _ size -> Array.init size (fun idx -> idx)) sizes_v
-        in
-        Ok (Embedding.make ~dom:u ~cod:v ~map ~inv)
+      else if equal u v then Ok (Embedding.id u)
       else
-        let stack_u = stack_extremal `Input u
-        and stack_v = stack_extremal `Input v in
-        let u', e_u = traverse u stack_u and v', e_v = traverse v stack_v in
+        let u', e_u = normalisation u and v', e_v = normalisation v in
         if not (equal u' v') then failure "canonical forms do not match"
         else
           let compose () =
@@ -585,7 +620,17 @@ let isomorphism_of (u : t) (v : t) : Embedding.t checked =
           compose ()
 
 let isomorphic (u : t) (v : t) : bool =
-  match isomorphism_of u v with Ok _ -> true | Error _ -> false
+  if u == v then true
+  else
+    let dim_u = dim u and dim_v = dim v in
+    if dim_u <> dim_v then false
+    else
+      let sizes_u = sizes u and sizes_v = sizes v in
+      if sizes_u <> sizes_v then false
+      else if equal u v then true
+      else
+        let u', _ = normalisation u and v', _ = normalisation v in
+        equal u' v'
 
 type pushout = { tip: t; inl: Embedding.t; inr: Embedding.t }
 
@@ -688,6 +733,7 @@ let attach (f : Embedding.t) (g : Embedding.t) : pushout =
           faces_out= tip_faces_out;
           cofaces_in= tip_cofaces_in;
           cofaces_out= tip_cofaces_out;
+          normal= false;
         }
       in
       let tip_sizes = sizes tip in

@@ -32,6 +32,7 @@ val make :
   cofaces_out:intset array array ->
   t
 
+val is_normal : t -> bool
 val intset_empty : intset
 val intset_add : int -> intset -> intset
 val intset_of_list : int list -> intset
@@ -82,6 +83,8 @@ val is_round : t -> bool
 val boundary : sign -> int -> t -> t * Embedding.t
 
 val traverse : t -> (int * intset) list -> t * Embedding.t
+val normalisation : t -> t * Embedding.t
+val boundary_traverse : sign -> int -> t -> t * Embedding.t
 val isomorphic : t -> t -> bool
 val isomorphism_of : t -> t -> Embedding.t checked
 

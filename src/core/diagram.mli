@@ -34,7 +34,22 @@ val paste : int -> t -> t -> t checked
 (** {2 Basic utilities} *)
 val is_round : t -> bool
 
+val parallelism :
+  t -> t -> (Ogposet.t * Ogposet.Embedding.t * Ogposet.Embedding.t) checked
+
+val parallel : t -> t -> bool
+
+val pastability :
+  int ->
+  t ->
+  t ->
+  (Ogposet.t * Ogposet.Embedding.t * Ogposet.Embedding.t) checked
+
+val pastable : int -> t -> t -> bool
+val normal : t -> t
+val is_normal : t -> bool
 val boundary : sign -> int -> t -> t
+val boundary_normal : sign -> int -> t -> t
 val is_cell : t -> bool
 val label_set_of : t -> (Id.Tag.t * int) list
 
