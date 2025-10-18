@@ -1,4 +1,12 @@
-type t = { shape: Ogposet.t; labels: Id.Tag.t array array }
+module Paste_tree = struct
+  type t =
+    | Leaf of Id.Tag.t
+    | Node of int * t * t
+end
+
+type sign = [ `Input | `Output ]
+type data = { shape: Ogposet.t; labels: Id.Tag.t array array }
+type t = { shape: Ogposet.t; labels: Id.Tag.t array array; tree: sign -> int -> Paste_tree.t }
 type error = Error.t
 type 'a checked = 'a Error.checked
 
@@ -7,13 +15,15 @@ let labels d = d.labels
 let dim d = Ogposet.dim d.shape
 let is_round d = Ogposet.is_round d.shape
 let is_cell d = Ogposet.is_atom d.shape
+let tree d = d.tree
 
 let cell0 tag =
   let shape = Ogposet.point in
   let labels = [| [| tag |] |] in
-  Ok { shape; labels }
+  let tree_fn _ _ = Paste_tree.Leaf tag in
+  Ok { shape; labels; tree= tree_fn }
 
-let pullback d emb =
+let pullback_data d emb =
   let dom = Ogposet.Embedding.dom emb in
   let cod_labels = labels d in
   let map = Ogposet.Embedding.map emb in
@@ -77,7 +87,7 @@ let cellN tag u v =
     if not (Ogposet.equal bd_u bd_v) then
       Error (Error.make "shapes of boundaries do not match")
     else
-      let pb_u = pullback u e_u and pb_v = pullback v e_v in
+      let pb_u = pullback_data u e_u and pb_v = pullback_data v e_v in
       if not (labels_equal pb_u.labels pb_v.labels) then
         Error (Error.make "boundaries do not match")
       else
@@ -163,7 +173,18 @@ let cellN tag u v =
             Array.init (d + 2) (fun dim ->
                 if dim <= d then labels_bd.(dim) else [| tag |])
           in
-          Ok { shape= shape_uv; labels= labels_uv }
+          let tree_u = u.tree and tree_v = v.tree in
+          let tree_fn sign k =
+            if k < d then tree_u sign k
+            else if k = d then
+              match sign with
+              | `Input ->
+                  tree_u sign k
+              | `Output ->
+                  tree_v sign k
+            else Paste_tree.Leaf tag
+          in
+          Ok { shape= shape_uv; labels= labels_uv; tree= tree_fn }
 
 let paste n u v =
   if n < 0 then Error (Error.make "dimension of pasting must be positive")
@@ -177,7 +198,7 @@ let paste n u v =
     if not (Ogposet.equal out_n_u in_n_v) then
       Error (Error.make "shapes of boundaries do not match")
     else
-      let pb_u = pullback u e_u and pb_v = pullback v e_v in
+      let pb_u = pullback_data u e_u and pb_v = pullback_data v e_v in
       if not (labels_equal pb_u.labels pb_v.labels) then
         Error (Error.make "boundaries do not match")
       else
@@ -211,11 +232,29 @@ let paste n u v =
                     assert false))
               base_labels
           in
-          Ok { shape= shape_uv; labels= labels_uv }
+          let tree_u = u.tree and tree_v = v.tree in
+          let tree_fn sign k =
+            if k < n then tree_u sign k
+            else if k = n then
+              match sign with
+              | `Input ->
+                  tree_u sign k
+              | `Output ->
+                  tree_v sign k
+            else
+              let t_u = tree_u sign k in
+              let t_v = tree_v sign k in
+              Paste_tree.Node (k, t_u, t_v)
+          in
+          Ok { shape= shape_uv; labels= labels_uv; tree= tree_fn }
 
-let boundary sign k d =
-  let _, emb = Ogposet.boundary sign k d.shape in
-  pullback d emb
+let boundary (sign : sign) k d =
+  let _, emb = Ogposet.boundary (sign :> Ogposet.sign) k d.shape in
+  let tree_fn s k' =
+    if k' < k then d.tree s k' else d.tree sign k
+  in
+  let pulled = pullback_data d emb in
+  { shape= pulled.shape; labels= pulled.labels; tree= tree_fn }
 
 let label_set_of d =
   let table = Hashtbl.create 16 in
@@ -242,7 +281,7 @@ let isomorphic u v =
     | Error _ ->
         false
     | Ok iso ->
-        let pulled = pullback v iso in
+        let pulled = pullback_data v iso in
         labels_equal u.labels pulled.labels
 
 let isomorphism_of u v =
@@ -253,6 +292,6 @@ let isomorphism_of u v =
     | Error _ as err ->
         err
     | Ok iso ->
-        let pulled = pullback v iso in
+        let pulled = pullback_data v iso in
         if labels_equal u.labels pulled.labels then Ok iso
         else Error (Error.make "labels do not match")

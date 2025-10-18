@@ -1,12 +1,25 @@
 (** {1 Diagrams} *)
 
+module Paste_tree : sig
+  type t =
+    | Leaf of Id.Tag.t
+    | Node of int * t * t
+end
+
 (** {2 Core types} *)
-type t = { shape: Ogposet.t; labels: Id.Tag.t array array }
+type sign = [ `Input | `Output ]
+
+type t = {
+  shape: Ogposet.t;
+  labels: Id.Tag.t array array;
+  tree: sign -> int -> Paste_tree.t;
+}
 
 val shape : t -> Ogposet.t
 val labels : t -> Id.Tag.t array array
 val dim : t -> int
 val is_round : t -> bool
+val tree : t -> sign -> int -> Paste_tree.t
 
 (** {2 Error-handling} *)
 type error = Error.t
@@ -19,7 +32,7 @@ val cellN : Id.Tag.t -> t -> t -> t checked
 val paste : int -> t -> t -> t checked
 
 (** {2 Derived operations} *)
-val boundary : Ogposet.sign -> int -> t -> t
+val boundary : sign -> int -> t -> t
 
 val label_set_of : t -> (Id.Tag.t * int) list
 val isomorphic : t -> t -> bool
