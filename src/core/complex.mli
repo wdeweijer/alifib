@@ -7,20 +7,17 @@ type generator_entry = { tag: Id.Tag.t; dim: int }
 type morphism_entry = { morphism: Morphism.t; domain: Id.Tag.t }
 type local_cell_entry = { data: Diagram.cell_data; dim: int }
 
-(** {2 Error-handling} *)
-type 'a checked = 'a Error.checked
-
 (** {2 Constructors} *)
 val empty : t
 
-val add_generator : t -> name:Id.Local.t -> dim:int -> tag:Id.Tag.t -> t checked
-val add_diagram : t -> name:Id.Local.simple -> Diagram.t -> t checked
+val add_generator : t -> name:Id.Local.t -> dim:int -> tag:Id.Tag.t -> t
+val add_diagram : t -> name:Id.Local.simple -> Diagram.t -> t
 
 val add_morphism :
-  t -> name:Id.Local.simple -> domain:Id.Tag.t -> Morphism.t -> t checked
+  t -> name:Id.Local.simple -> domain:Id.Tag.t -> Morphism.t -> t
 
 val add_local_cell :
-  t -> name:Id.Local.simple -> dim:int -> Diagram.cell_data -> t checked
+  t -> name:Id.Local.simple -> dim:int -> Diagram.cell_data -> t
 
 (** {2 Lookups} *)
 val find_generator : t -> Id.Local.t -> generator_entry option

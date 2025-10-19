@@ -1,5 +1,3 @@
-type 'a checked = 'a Error.checked
-
 module LocalNameOrd = struct
   type t = Id.Local.t
 
@@ -70,8 +68,6 @@ let empty =
     used_names= SimpleSet.empty;
   }
 
-let ok x = Ok x
-let error msg = Error (Error.make msg)
 let option_default default = function Some value -> value | None -> default
 
 let add_to_name_grade name dim grades =
@@ -89,42 +85,24 @@ let add_to_simple_grade name dim grades =
     grades
 
 let add_generator t ~name ~dim ~tag =
-  if NameMap.mem name t.generators.by_name then
-    error "generator name already defined"
-  else if TagMap.mem tag t.generators.by_tag then
-    error "generator tag already defined"
-  else
-    let by_name = NameMap.add name { tag; dim } t.generators.by_name in
-    let by_tag = TagMap.add tag name t.generators.by_tag in
-    let by_dim = add_to_name_grade name dim t.generators.by_dim in
-    ok { t with generators= { by_name; by_tag; by_dim } }
-
-let ensure_name_available t name =
-  if SimpleSet.mem name t.used_names then error "name already used" else Ok ()
+  let by_name = NameMap.add name { tag; dim } t.generators.by_name in
+  let by_tag = TagMap.add tag name t.generators.by_tag in
+  let by_dim = add_to_name_grade name dim t.generators.by_dim in
+  { t with generators= { by_name; by_tag; by_dim } }
 
 let add_diagram t ~name diagram =
-  match ensure_name_available t name with
-  | Error _ as err ->
-      err
-  | Ok () ->
-      let diagrams = SimpleMap.add name diagram t.diagrams in
-      ok { t with diagrams; used_names= SimpleSet.add name t.used_names }
+  let diagrams = SimpleMap.add name diagram t.diagrams in
+  { t with diagrams; used_names= SimpleSet.add name t.used_names }
 
 let add_morphism t ~name ~domain morphism =
-  match ensure_name_available t name with
-  | Error _ as err ->
-      err
-  | Ok () ->
-      let entry = { morphism; domain } in
-      let morphisms = SimpleMap.add name entry t.morphisms in
-      ok { t with morphisms; used_names= SimpleSet.add name t.used_names }
+  let entry = { morphism; domain } in
+  let morphisms = SimpleMap.add name entry t.morphisms in
+  { t with morphisms; used_names= SimpleSet.add name t.used_names }
 
 let add_local_cell t ~name ~dim data =
-  if SimpleMap.mem name t.local_cells.by_name then error "name already defined"
-  else
-    let by_name = SimpleMap.add name { data; dim } t.local_cells.by_name in
-    let by_dim = add_to_simple_grade name dim t.local_cells.by_dim in
-    ok { t with local_cells= { by_name; by_dim } }
+  let by_name = SimpleMap.add name { data; dim } t.local_cells.by_name in
+  let by_dim = add_to_simple_grade name dim t.local_cells.by_dim in
+  { t with local_cells= { by_name; by_dim } }
 
 let find_generator t name = NameMap.find_opt name t.generators.by_name
 let find_generator_by_tag t tag = TagMap.find_opt tag t.generators.by_tag
