@@ -1,0 +1,4 @@
+(library
+ (name alifib_interpretation)
+ (modules state)
+ (libraries alifib_core alifib_helper))
