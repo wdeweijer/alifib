@@ -63,6 +63,17 @@ module Local = struct
   let to_string n = n
 end
 
+module Module = struct
+  type t = string
+
+  let of_path path = path
+  let to_string id = id
+  let equal = String.equal
+  let compare = String.compare
+  let hash = Hashtbl.hash
+  let pp fmt id = Format.fprintf fmt "%s" id
+end
+
 module Tag = struct
   type t = [ `Local of Local.t | `Global of Global.t ]
 

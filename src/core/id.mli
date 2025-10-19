@@ -22,6 +22,17 @@ module Local : sig
   val to_string : t -> string
 end
 
+module Module : sig
+  type t
+
+  val of_path : string -> t
+  val to_string : t -> string
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val hash : t -> int
+  val pp : Format.formatter -> t -> unit
+end
+
 module Tag : sig
   type t = [ `Local of Local.t | `Global of Global.t ]
 
