@@ -3,7 +3,9 @@
 (** {2 Core types} *)
 type t
 
-type cell_data = { boundary_in: Diagram.t; boundary_out: Diagram.t }
+type cell_data =
+  | Zero
+  | Boundary of { boundary_in: Diagram.t; boundary_out: Diagram.t }
 
 (** {2 Error-handling} *)
 type 'a checked = 'a Error.checked
@@ -15,8 +17,7 @@ val extend :
   t ->
   tag:Id.Tag.t ->
   dim:int ->
-  boundary_in:Diagram.t ->
-  boundary_out:Diagram.t ->
+  cell_data:cell_data ->
   image:Diagram.t ->
   t checked
 

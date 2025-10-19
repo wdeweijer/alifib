@@ -11,26 +11,19 @@ module TagTable = Hashtbl.Make (struct
 end)
 
 type 'a checked = 'a Error.checked
-type cell_data = { boundary_in: Diagram.t; boundary_out: Diagram.t }
-type entry = { dim: int; boundaries: cell_data; image: Diagram.t }
+
+type cell_data =
+  | Zero
+  | Boundary of { boundary_in: Diagram.t; boundary_out: Diagram.t }
+
+type entry = { dim: int; cell_data: cell_data; image: Diagram.t }
 type t = { table: entry TagTable.t; cellular: bool }
+
+let make_entry ~dim ~cell_data ~image = { dim; cell_data; image }
 
 let init () =
   let table = TagTable.create 1 in
   Ok { table; cellular= true }
-
-let[@warning "-32"] of_list entries =
-  (* Private helper: assumes entries already validated. *)
-  let capacity = max 1 (List.length entries) in
-  let table = TagTable.create capacity in
-  let cellular = ref true in
-  List.iter
-    (fun (tag, dim, boundaries, image) ->
-      TagTable.replace table tag { dim; boundaries; image }
-      ; if !cellular then ()
-        else if not (Diagram.is_cell image) then cellular := false)
-    entries
-  ; { table; cellular= !cellular }
 
 let domain_of_definition m =
   TagTable.fold (fun tag _ acc -> tag :: acc) m.table []
@@ -40,7 +33,7 @@ let is_defined_at m tag = TagTable.mem m.table tag
 let cell_data m tag =
   match TagTable.find_opt m.table tag with
   | Some entry ->
-      Ok entry.boundaries
+      Ok entry.cell_data
   | None ->
       Error (Error.make "not in the domain of definition")
 
@@ -128,38 +121,50 @@ let apply f diagram =
         in
         Ok (f_tree root_tree)
 
-let extend f ~tag ~dim ~boundary_in ~boundary_out ~image =
+let extend f ~tag ~dim ~cell_data ~image =
   if is_defined_at f tag then Error (Error.make "already defined")
   else if Diagram.dim image <> dim then
     Error (Error.make "dimensions do not match")
   else if not (Diagram.is_round image) then
     Error (Error.make "image is not round")
+  else if dim = 0 then
+    match cell_data with
+    | Zero ->
+        let table = TagTable.copy f.table in
+        TagTable.replace table tag (make_entry ~dim ~cell_data ~image)
+        ; Ok { table; cellular= f.cellular }
+    | Boundary _ ->
+        assert false
   else
-    match apply f boundary_in with
-    | Error _ as err ->
-        err
-    | Ok mapped_in -> (
-        match apply f boundary_out with
+    match cell_data with
+    | Zero ->
+        assert false
+    | Boundary { boundary_in; boundary_out } -> (
+        match apply f boundary_in with
         | Error _ as err ->
             err
-        | Ok mapped_out ->
-            let boundary_idx = dim - 1 in
-            let expected_input =
-              Diagram.boundary_normal `Input boundary_idx image
-            in
-            let mapped_input = Diagram.normal mapped_in in
-            if not (Diagram.equal mapped_input expected_input) then
-              Error (Error.make "input boundaries do not match")
-            else
-              let expected_output =
-                Diagram.boundary_normal `Output boundary_idx image
-              in
-              let mapped_output = Diagram.normal mapped_out in
-              if not (Diagram.equal mapped_output expected_output) then
-                Error (Error.make "output boundaries do not match")
-              else
-                let table = TagTable.copy f.table in
-                TagTable.replace table tag
-                  { dim; boundaries= { boundary_in; boundary_out }; image }
-                ; let cellular = f.cellular && Diagram.is_cell image in
-                  Ok { table; cellular })
+        | Ok mapped_in -> (
+            match apply f boundary_out with
+            | Error _ as err ->
+                err
+            | Ok mapped_out ->
+                let boundary_idx = dim - 1 in
+                let expected_input =
+                  Diagram.boundary_normal `Input boundary_idx image
+                in
+                let mapped_input = Diagram.normal mapped_in in
+                if not (Diagram.equal mapped_input expected_input) then
+                  Error (Error.make "input boundaries do not match")
+                else
+                  let expected_output =
+                    Diagram.boundary_normal `Output boundary_idx image
+                  in
+                  let mapped_output = Diagram.normal mapped_out in
+                  if not (Diagram.equal mapped_output expected_output) then
+                    Error (Error.make "output boundaries do not match")
+                  else
+                    let table = TagTable.copy f.table in
+                    TagTable.replace table tag
+                      (make_entry ~dim ~cell_data ~image)
+                    ; let cellular = f.cellular && Diagram.is_cell image in
+                      Ok { table; cellular }))
