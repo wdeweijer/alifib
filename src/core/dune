@@ -1,5 +1,5 @@
 (library
  (name alifib_core)
  (wrapped false)
- (modules ogposet diagram morphism complex)
+(modules ogposet diagram morphism complex state)
  (libraries alifib_helper))
