@@ -85,19 +85,19 @@ rule token env = parse
     }
   | "<<=" {
       reset_newlines env;
-      make_token env Generator_bind lexbuf
+      make_token env Has_value lexbuf
     }
   | "::" {
       reset_newlines env;
-      make_token env Double_colon lexbuf
+      make_token env Of_shape lexbuf
     }
   | ":=" {
       reset_newlines env;
-      make_token env Assign lexbuf
+      make_token env Definition lexbuf
     }
   | "=>" {
       reset_newlines env;
-      make_token env Fat_arrow lexbuf
+      make_token env Maps_to lexbuf
     }
   | "->" {
       reset_newlines env;
@@ -129,7 +129,7 @@ rule token env = parse
       let nat_span = Pos.make_span ~start:after_hash ~stop:end_point in
       let nat_token = Token.make (Nat "0") nat_span in
       enqueue env nat_token;
-      Token.make Hash hash_span
+      Token.make Paste hash_span
     }
   | ("#" ['1'-'9']['0'-'9']*) as lexeme {
       reset_newlines env;
@@ -145,7 +145,7 @@ rule token env = parse
       let nat_span = Pos.make_span ~start:after_hash ~stop:end_point in
       let nat_token = Token.make (Nat digits) nat_span in
       enqueue env nat_token;
-      Token.make Hash hash_span
+      Token.make Paste hash_span
     }
   | "#" {
       reset_newlines env;

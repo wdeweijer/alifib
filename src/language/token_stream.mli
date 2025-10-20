@@ -1,5 +1,4 @@
 type t
-
 type cursor
 
 val create : source:Positions.Source.t -> string -> t

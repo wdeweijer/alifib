@@ -1,22 +1,6 @@
-type comma_origin =
-  [ `Explicit
-  | `From_newline
-  ]
-
-type keyword =
-  [ `Include
-  | `Attach
-  | `Along
-  | `Assert
-  | `In
-  | `Out
-  | `Type
-  ]
-
-type trivia =
-  | Whitespace of string
-  | Newline of string
-  | Comment of string
+type comma_origin = [ `Explicit | `From_newline ]
+type keyword = [ `Include | `Attach | `Along | `Assert | `In | `Out | `Type ]
+type trivia = Whitespace of string | Newline of string | Comment of string
 
 type kind =
   | At
@@ -31,29 +15,21 @@ type kind =
   | R_paren
   | Comma of comma_origin
   | Dot
-  | Hash
+  | Paste
   | Colon
-  | Double_colon
-  | Assign
+  | Of_shape
+  | Maps_to
   | Arrow
-  | Fat_arrow
-  | Generator_bind
+  | Has_value
+  | Definition
   | Equal
   | Hole
   | Trivia of trivia
   | Error of string
   | Eof
 
-type classification =
-  [ `Trivia
-  | `Error
-  | `Syntax
-  ]
-
-type t = private {
-  kind : kind;
-  span : Positions.span;
-}
+type classification = [ `Trivia | `Error | `Syntax ]
+type t = private { kind: kind; span: Positions.span }
 
 val make : kind -> Positions.span -> t
 val kind : t -> kind

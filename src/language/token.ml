@@ -1,22 +1,6 @@
-type comma_origin =
-  [ `Explicit
-  | `From_newline
-  ]
-
-type keyword =
-  [ `Include
-  | `Attach
-  | `Along
-  | `Assert
-  | `In
-  | `Out
-  | `Type
-  ]
-
-type trivia =
-  | Whitespace of string
-  | Newline of string
-  | Comment of string
+type comma_origin = [ `Explicit | `From_newline ]
+type keyword = [ `Include | `Attach | `Along | `Assert | `In | `Out | `Type ]
+type trivia = Whitespace of string | Newline of string | Comment of string
 
 type kind =
   | At
@@ -31,50 +15,32 @@ type kind =
   | R_paren
   | Comma of comma_origin
   | Dot
-  | Hash
+  | Paste
   | Colon
-  | Double_colon
-  | Assign
+  | Of_shape
+  | Maps_to
   | Arrow
-  | Fat_arrow
-  | Generator_bind
+  | Has_value
+  | Definition
   | Equal
   | Hole
   | Trivia of trivia
   | Error of string
   | Eof
 
-type classification =
-  [ `Trivia
-  | `Error
-  | `Syntax
-  ]
-
-type t = {
-  kind : kind;
-  span : Positions.span;
-}
+type classification = [ `Trivia | `Error | `Syntax ]
+type t = { kind: kind; span: Positions.span }
 
 let make kind span = { kind; span }
 let kind t = t.kind
 let span t = t.span
-
-let is_trivia = function
-  | { kind = Trivia _; _ } ->
-      true
-  | _ ->
-      false
-
-let is_error = function
-  | { kind = Error _; _ } ->
-      true
-  | _ ->
-      false
+let is_trivia = function { kind= Trivia _; _ } -> true | _ -> false
+let is_error = function { kind= Error _; _ } -> true | _ -> false
 
 let classify = function
-  | { kind = Trivia _; _ } ->
+  | { kind= Trivia _; _ } ->
       `Trivia
-  | { kind = Error _; _ } ->
+  | { kind= Error _; _ } ->
       `Error
   | _ ->
       `Syntax
@@ -98,7 +64,7 @@ let keyword_of_string = function
       None
 
 let comma_origin = function
-  | { kind = Comma origin; _ } ->
+  | { kind= Comma origin; _ } ->
       Some origin
   | _ ->
       None
