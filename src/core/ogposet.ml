@@ -1,15 +1,6 @@
-(* Minimal oriented graded posets with embeddings. Internal: no well-formedness
-   checks. Efficient and replaceable IntSet backend. *)
-
-(* --- Replaceable integer set implementation --------------------------- *)
-
 module IntSet = Set.Make (Int)
-(* Swap this definition if desired; only this module needs to change. *)
 
 type intset = IntSet.t
-
-(* --- Core definitions ------------------------------------------------- *)
-
 type sign = [ `Input | `Output | `Both ]
 type grade = IntSet.t array
 type adjacency = grade array
@@ -64,8 +55,6 @@ let point =
     normal= true;
   }
 
-(* --- Accessors -------------------------------------------------------- *)
-
 let faces_of sign x ~dim ~pos =
   match sign with
   | `Input ->
@@ -99,8 +88,6 @@ let equal (a : t) (b : t) : bool =
         else eq_level fam1.(d) fam2.(d) 0 && eq_family fam1 fam2 (d + 1)
       in
       eq_family a.faces_in b.faces_in 0 && eq_family a.faces_out b.faces_out 0
-
-(* --- Embeddings ------------------------------------------------------- *)
 
 module Embedding = struct
   type t = {
@@ -178,8 +165,6 @@ let remap_adjacency ~(levels : int) ~(forward : int array array)
                   let y = inv_dom.(target_dim).(x) in
                   if y < 0 then None else Some y)
                 adj.(j).(old)))
-
-(* --- Boundary --------------------------------------------------------- *)
 
 let extremal (s : sign) (k : int) (g : t) : intset =
   let n = Array.length g.faces_in.(k) in

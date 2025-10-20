@@ -1,29 +1,25 @@
-(** {1 Oriented graded posets (ogposets)}
-
-    Minimal internal data structure with embeddings and standard categorical
-    constructions. No well-formedness checks are performed; this module is
-    designed for use inside verified higher-level code. *)
+(** {1 Oriented graded posets (ogposets)} *)
 
 (** {2 Core types} *)
 
-(** An oriented graded poset (ogposet). *)
 type t
-
 type poset = t
-
-(** Abstract type of sets of integers used for faces and cofaces. *)
-type intset
+type sign = [ `Input | `Output | `Both ]
 
 (** {2 Error handling} *)
 type error = Error.t
 
 type 'a checked = 'a Error.checked
 
-(** Orientation: input, output, or both. *)
-type sign = [ `Input | `Output | `Both ]
+(** {2 Sets of integers} *)
+type intset
 
-(** Build an ogposet directly from adjacency arrays of integer sets and its
-    dimension. *)
+val intset_empty : intset
+val intset_add : int -> intset -> intset
+val intset_of_list : int list -> intset
+val intset_of_array : int array -> intset
+
+(** {2 Constructors} *)
 val make :
   dim:int ->
   faces_in:intset array array ->
@@ -32,19 +28,15 @@ val make :
   cofaces_out:intset array array ->
   t
 
-val is_normal : t -> bool
-val intset_empty : intset
-val intset_add : int -> intset -> intset
-val intset_of_list : int list -> intset
-val intset_of_array : int array -> intset
 val empty : t
 val point : t
+
+(** {2 Basic utilities} *)
+val is_normal : t -> bool
+
 val dim : t -> int
 val sizes : t -> int array
-
-(** Access the input/output/both faces or cofaces of a given element. *)
 val faces_of : sign -> t -> dim:int -> pos:int -> intset
-
 val cofaces_of : sign -> t -> dim:int -> pos:int -> intset
 val equal : t -> t -> bool
 
@@ -67,29 +59,23 @@ end
 
 (** {2 Boundary operations} *)
 
-(** extremal `Input k g` = k-cells with no output cofaces, extremal `Output k g`
-    = k-cells with no input cofaces, extremal `Both k g` = union of the two *)
 val extremal : sign -> int -> t -> intset
-
 val maximal : int -> t -> intset
 val is_pure : t -> bool
 val is_atom : t -> bool
-
-(** roundness predicate; to be run exclusively on molecules *)
-val is_round : t -> bool
-
-(** [boundary sign at_dim X] is the embedding of the appropriate boundary of X
-    into it *)
 val boundary : sign -> int -> t -> t * Embedding.t
-
-val traverse : t -> (int * intset) list -> t * Embedding.t
-val normalisation : t -> t * Embedding.t
-val boundary_traverse : sign -> int -> t -> t * Embedding.t
-val isomorphic : t -> t -> bool
-val isomorphism_of : t -> t -> Embedding.t checked
 
 (** {2 Pushouts} *)
 
 type pushout = { tip: t; inl: Embedding.t; inr: Embedding.t }
 
 val pushout : Embedding.t -> Embedding.t -> pushout
+
+(** {2 For molecules} *)
+
+val is_round : t -> bool
+val traverse : t -> (int * intset) list -> t * Embedding.t
+val normalisation : t -> t * Embedding.t
+val boundary_traverse : sign -> int -> t -> t * Embedding.t
+val isomorphic : t -> t -> bool
+val isomorphism_of : t -> t -> Embedding.t checked
