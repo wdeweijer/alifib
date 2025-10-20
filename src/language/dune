@@ -1,5 +1,7 @@
+(ocamllex lexer)
+
 (library
  (name alifib_language)
  (wrapped false)
- (modules diagnostics)
+ (modules token lexer token_stream diagnostics)
  (libraries alifib_helper alifib_core))
