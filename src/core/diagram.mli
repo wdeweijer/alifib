@@ -17,7 +17,7 @@ type cell_data =
   | Zero
   | Boundary of { boundary_in: t; boundary_out: t }
 
-(** {2 Destructors} *)
+(** {2 Accessors} *)
 val shape : t -> Ogposet.t
 
 val labels : t -> Id.Tag.t array array

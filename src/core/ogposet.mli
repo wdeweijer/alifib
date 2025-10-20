@@ -31,7 +31,7 @@ val make :
 val empty : t
 val point : t
 
-(** {2 Basic utilities} *)
+(** {2 Accessors} *)
 val is_normal : t -> bool
 
 val dim : t -> int
