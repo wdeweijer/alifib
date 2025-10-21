@@ -1,7 +1,11 @@
 (ocamllex lexer)
 
+(menhir
+ (modules parser)
+ (flags --table))
+
 (library
  (name alifib_language)
  (wrapped false)
- (modules token lexer token_stream diagnostics)
- (libraries alifib_helper alifib_core))
+ (modules ast parser parser_driver token lexer token_stream diagnostics)
+ (libraries alifib_helper alifib_core menhirLib))
