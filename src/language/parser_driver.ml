@@ -11,14 +11,74 @@ let positions_of_token token =
   (startp, endp)
 
 let to_parser_token token =
-  if Token.is_trivia token then None
+  if Token.is_trivia token || Token.is_error token then
+    None
   else
     let startp, endp = positions_of_token token in
+    let open Parser in
     match Token.kind token with
     | Token.Eof ->
-        Some (Parser.EOF, startp, endp)
-    | kind ->
-        Some (Parser.ANY kind, startp, endp)
+        Some (EOF, startp, endp)
+    | Token.At ->
+        Some (AT token, startp, endp)
+    | Token.Keyword kw -> (
+        match kw with
+        | `Type ->
+            Some (TYPE token, startp, endp)
+        | `Include ->
+            Some (INCLUDE token, startp, endp)
+        | `Attach ->
+            Some (ATTACH token, startp, endp)
+        | `Along ->
+            Some (ALONG token, startp, endp)
+        | `Assert ->
+            Some (ASSERT token, startp, endp)
+        | `In ->
+            Some (IN token, startp, endp)
+        | `Out ->
+            Some (OUT token, startp, endp)
+        | `Let ->
+            Some (LET token, startp, endp)
+        | `As ->
+            Some (AS token, startp, endp) )
+    | Token.Identifier _ ->
+        Some (IDENT token, startp, endp)
+    | Token.Nat _ ->
+        Some (NAT token, startp, endp)
+    | Token.L_brace ->
+        Some (LBRACE token, startp, endp)
+    | Token.R_brace ->
+        Some (RBRACE token, startp, endp)
+    | Token.L_bracket ->
+        Some (LBRACKET token, startp, endp)
+    | Token.R_bracket ->
+        Some (RBRACKET token, startp, endp)
+    | Token.L_paren ->
+        Some (LPAREN token, startp, endp)
+    | Token.R_paren ->
+        Some (RPAREN token, startp, endp)
+    | Token.Comma _ ->
+        Some (COMMA token, startp, endp)
+    | Token.Dot ->
+        Some (DOT token, startp, endp)
+    | Token.Paste ->
+        Some (PASTE token, startp, endp)
+    | Token.Colon ->
+        Some (COLON token, startp, endp)
+    | Token.Of_shape ->
+        Some (OF_SHAPE token, startp, endp)
+    | Token.Maps_to ->
+        Some (MAPS_TO token, startp, endp)
+    | Token.Arrow ->
+        Some (ARROW token, startp, endp)
+    | Token.Has_value ->
+        Some (HAS_VALUE token, startp, endp)
+    | Token.Equal ->
+        Some (EQUAL token, startp, endp)
+    | Token.Hole ->
+        Some (HOLE token, startp, endp)
+    | Token.Trivia _ | Token.Error _ ->
+        None
 
 let add_parse_error diagnostics message =
   let span = Positions.point_span Positions.unknown_point in
