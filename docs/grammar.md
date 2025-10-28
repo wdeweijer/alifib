@@ -21,7 +21,7 @@
 <Morphism> ::= <MComp> | <Morphism> "." <MComp>
 <MComp> ::= <MTerm> | <Name>
 <MTerm> ::= "(" "map" <MExt> "::" <Complex> ")"
-<MExt> ::= [ <Morphism> ] "[" <MBlock> "]"
+<MExt> ::= [ <Morphism> ] "[" [ <MBlock> ] "]"
 
 <MDef> ::= <Morphism> | <MExt>
 <MNamer> ::= "let" <Name> "::" <Address> "=" <MDef>

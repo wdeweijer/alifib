@@ -86,7 +86,10 @@ and m_comp_desc = M_comp_term of m_term | M_comp_name of name
 and m_term = m_term_desc node
 and m_term_desc = { m_term_ext: m_ext; m_term_target: complex }
 and m_ext = m_ext_desc node
-and m_ext_desc = { m_ext_prefix: morphism option; m_ext_block: m_block }
+and m_ext_desc = {
+  m_ext_prefix: morphism option;
+  m_ext_block: m_block option;
+}
 and m_def = m_def_desc node
 and m_def_desc = M_def_morphism of morphism | M_def_ext of m_ext
 and m_block = m_block_desc node

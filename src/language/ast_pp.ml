@@ -169,7 +169,7 @@ and m_ext fmt ext =
   fprintf fmt "@[<v 2>(MExt@,%a@,%a)@]"
     (pp_field "prefix" (pp_option morphism))
     m_ext_prefix
-    (pp_field "block" m_block)
+    (pp_field "block" (pp_option m_block))
     m_ext_block
 
 and m_def fmt def =

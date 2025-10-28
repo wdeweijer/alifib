@@ -408,18 +408,18 @@ m_term:
     }
 
 m_ext:
-  | prefix_opt=morphism_opt lbracket=LBRACKET block=m_block rbracket=RBRACKET {
+  | prefix_opt=morphism_opt lbracket=LBRACKET block_opt=m_block_opt rbracket=RBRACKET {
       let span =
         merge_spans
           [ option_span prefix_opt
           ; token_span lbracket
-          ; node_span block
+          ; option_span block_opt
           ; token_span rbracket
           ]
       in
       mk ?span
         { m_ext_prefix = prefix_opt
-        ; m_ext_block = block
+        ; m_ext_block = block_opt
         }
     }
 
@@ -432,6 +432,10 @@ m_def:
       let span = ext.span in
       mk ?span (M_def_ext ext)
     }
+
+m_block_opt:
+  | { None }
+  | block=m_block { Some block }
 
 m_block:
   | item=m_instr tail=m_block_tail {
