@@ -25,7 +25,7 @@
 <MDef> ::= <Morphism> | <MExt>
 <MNamer> ::= "let" <Name> "::" <Address> "=" <MDef>
 <MBlock> ::= <MInstr> { "," <MInstr> }
-<MInstr> ::= <Address> "=>" <Pasting>
+<MInstr> ::= <Pasting> "=>" <Pasting>
 
 <Diagram> ::= <DConcat> | <Diagram> "#" <Nat> <DConcat>
 <DConcat> ::= <DExpr> | <DConcat> <DExpr>

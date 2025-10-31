@@ -426,17 +426,17 @@ m_block_tail:
   | { [] }
 
 m_instr:
-  | address=address maps=MAPS_TO pasting=pasting {
+  | source=pasting maps=MAPS_TO target=pasting {
       let span =
         merge_spans
-          [ node_span address
+          [ node_span source
           ; token_span maps
-          ; node_span pasting
+          ; node_span target
           ]
       in
       mk ?span
-        { m_instr_address = address
-        ; m_instr_pasting = pasting
+        { m_instr_source = source
+        ; m_instr_target = target
         }
     }
 
