@@ -1,11 +1,11 @@
 module Report = Diagnostics.Report
 
-type session = { current_module: Id.Module.t; state: State.t }
+type context = { current_module: Id.Module.t; state: State.t }
 
-let make_session ~module_id ~state = { current_module= module_id; state }
-let session_module { current_module; _ } = current_module
-let session_state { state; _ } = state
-let with_state session state = { session with state }
+let make_context ~module_id ~state = { current_module= module_id; state }
+let context_module { current_module; _ } = current_module
+let context_state { state; _ } = state
+let with_state ctx state = { ctx with state }
 
 type load_error = [ `Not_found | `Io_error of string ]
 
@@ -15,9 +15,9 @@ type file_loader = {
 }
 
 type status = [ `Ok | `Error ]
-type result = { session: session; diagnostics: Report.t; status: status }
+type result = { context: context; diagnostics: Report.t; status: status }
 
-let empty_result session = { session; diagnostics= Report.empty; status= `Ok }
+let empty_result context = { context; diagnostics= Report.empty; status= `Ok }
 
 let add_diagnostic result diagnostic =
   let status =
@@ -28,7 +28,7 @@ let add_diagnostic result diagnostic =
         status
   in
   {
-    session= result.session;
+    context= result.context;
     diagnostics= Report.add diagnostic result.diagnostics;
     status;
   }
@@ -42,7 +42,7 @@ let combine left right =
     | `Ok, `Ok ->
         `Ok
   in
-  { session= right.session; diagnostics; status }
+  { context= right.context; diagnostics; status }
 
 let has_errors { status; _ } = match status with `Error -> true | `Ok -> false
 
@@ -69,9 +69,9 @@ let stub_message kind =
 let stub_diagnostic kind span =
   Diagnostics.make `Error interpreter_producer span (stub_message kind)
 
-let stub_node kind session (node : _ Lang_ast.node) =
+let stub_node kind context (node : _ Lang_ast.node) =
   let span = Lang_ast.span_of_node node in
-  add_diagnostic (empty_result session) (stub_diagnostic kind span)
+  add_diagnostic (empty_result context) (stub_diagnostic kind span)
 
 let name_to_string (name : Lang_ast.name) = Id.Local.to_string name.value
 
@@ -90,69 +90,69 @@ let missing_module_diagnostic span relative =
   let message = Printf.sprintf "Could not find module `%s`" relative in
   Diagnostics.make `Error interpreter_producer span message
 
-let interpret_program ~loader:_ session program =
-  stub_node "program" session program
+let interpret_program ~loader:_ context program =
+  stub_node "program" context program
 
-let interpret_block ~loader:_ session block = stub_node "block" session block
+let interpret_block ~loader:_ context block = stub_node "block" context block
 
-let interpret_complex ~loader:_ session complex =
-  stub_node "complex" session complex
+let interpret_complex ~loader:_ context complex =
+  stub_node "complex" context complex
 
-let interpret_c_block_type ~loader:_ session c_block_type =
-  stub_node "c_block_type" session c_block_type
+let interpret_c_block_type ~loader:_ context c_block_type =
+  stub_node "c_block_type" context c_block_type
 
-let interpret_c_block ~loader:_ session c_block =
-  stub_node "c_block" session c_block
+let interpret_c_block ~loader:_ context c_block =
+  stub_node "c_block" context c_block
 
-let interpret_c_block_local ~loader:_ session c_block_local =
-  stub_node "c_block_local" session c_block_local
+let interpret_c_block_local ~loader:_ context c_block_local =
+  stub_node "c_block_local" context c_block_local
 
-let interpret_c_instr_type ~loader:_ session c_instr_type =
-  stub_node "c_instr_type" session c_instr_type
+let interpret_c_instr_type ~loader:_ context c_instr_type =
+  stub_node "c_instr_type" context c_instr_type
 
-let interpret_c_instr ~loader:_ session c_instr =
-  stub_node "c_instr" session c_instr
+let interpret_c_instr ~loader:_ context c_instr =
+  stub_node "c_instr" context c_instr
 
-let interpret_c_instr_local ~loader:_ session c_instr_local =
-  stub_node "c_instr_local" session c_instr_local
+let interpret_c_instr_local ~loader:_ context c_instr_local =
+  stub_node "c_instr_local" context c_instr_local
 
-let interpret_generator_type ~loader:_ session generator_type =
-  stub_node "generator_type" session generator_type
+let interpret_generator_type ~loader:_ context generator_type =
+  stub_node "generator_type" context generator_type
 
-let interpret_generator ~loader:_ session generator =
-  stub_node "generator" session generator
+let interpret_generator ~loader:_ context generator =
+  stub_node "generator" context generator
 
-let interpret_boundaries ~loader:_ session boundaries =
-  stub_node "boundaries" session boundaries
+let interpret_boundaries ~loader:_ context boundaries =
+  stub_node "boundaries" context boundaries
 
-let interpret_address ~loader:_ session address =
-  stub_node "address" session address
+let interpret_address ~loader:_ context address =
+  stub_node "address" context address
 
-let interpret_morphism ~loader:_ session morphism =
-  stub_node "morphism" session morphism
+let interpret_morphism ~loader:_ context morphism =
+  stub_node "morphism" context morphism
 
-let interpret_m_comp ~loader:_ session m_comp =
-  stub_node "m_comp" session m_comp
+let interpret_m_comp ~loader:_ context m_comp =
+  stub_node "m_comp" context m_comp
 
-let interpret_m_term ~loader:_ session m_term =
-  stub_node "m_term" session m_term
+let interpret_m_term ~loader:_ context m_term =
+  stub_node "m_term" context m_term
 
-let interpret_m_ext ~loader:_ session m_ext = stub_node "m_ext" session m_ext
-let interpret_m_def ~loader:_ session m_def = stub_node "m_def" session m_def
+let interpret_m_ext ~loader:_ context m_ext = stub_node "m_ext" context m_ext
+let interpret_m_def ~loader:_ context m_def = stub_node "m_def" context m_def
 
-let interpret_m_block ~loader:_ session m_block =
-  stub_node "m_block" session m_block
+let interpret_m_block ~loader:_ context m_block =
+  stub_node "m_block" context m_block
 
-let interpret_m_instr ~loader:_ session m_instr =
-  stub_node "m_instr" session m_instr
+let interpret_m_instr ~loader:_ context m_instr =
+  stub_node "m_instr" context m_instr
 
-let interpret_mnamer ~loader:_ session mnamer =
-  stub_node "mnamer" session mnamer
+let interpret_mnamer ~loader:_ context mnamer =
+  stub_node "mnamer" context mnamer
 
-let interpret_dnamer ~loader:_ session dnamer =
-  stub_node "dnamer" session dnamer
+let interpret_dnamer ~loader:_ context dnamer =
+  stub_node "dnamer" context dnamer
 
-let interpret_include ~loader session include_stmt =
+let interpret_include ~loader context include_stmt =
   let loader = normalize_loader loader in
   let span = Lang_ast.span_of_node include_stmt in
   let open Lang_ast in
@@ -161,11 +161,11 @@ let interpret_include ~loader session include_stmt =
   let segments = address_segments address in
   match segments_to_relative segments with
   | None ->
-      stub_node "include" session include_stmt
+      stub_node "include" context include_stmt
   | Some relative ->
       let rec attempt = function
         | [] ->
-            add_diagnostic (empty_result session)
+            add_diagnostic (empty_result context)
               (missing_module_diagnostic span relative)
         | directory :: rest -> (
             let candidate = Filename.concat directory relative in
@@ -173,12 +173,12 @@ let interpret_include ~loader session include_stmt =
             | Ok _contents -> (
                 let canonical = Path.canonicalize candidate in
                 let module_id = Id.Module.of_path canonical in
-                let state = session.state in
+                let state = context.state in
                 match State.find_module state module_id with
                 | Some _ ->
-                    empty_result session
+                    empty_result context
                 | None ->
-                    stub_node "include" session include_stmt)
+                    stub_node "include" context include_stmt)
             | Error `Not_found ->
                 attempt rest
             | Error (`Io_error reason) ->
@@ -189,39 +189,39 @@ let interpret_include ~loader session include_stmt =
                 let diagnostic =
                   Diagnostics.make `Error interpreter_producer span message
                 in
-                add_diagnostic (empty_result session) diagnostic)
+                add_diagnostic (empty_result context) diagnostic)
       in
       attempt loader.search_paths
 
-let interpret_attach ~loader:_ session attach =
-  stub_node "attach" session attach
+let interpret_attach ~loader:_ context attach =
+  stub_node "attach" context attach
 
-let interpret_assert ~loader:_ session assert_stmt =
-  stub_node "assert" session assert_stmt
+let interpret_assert ~loader:_ context assert_stmt =
+  stub_node "assert" context assert_stmt
 
-let interpret_diagram ~loader:_ session diagram =
-  stub_node "diagram" session diagram
+let interpret_diagram ~loader:_ context diagram =
+  stub_node "diagram" context diagram
 
-let interpret_d_concat ~loader:_ session d_concat =
-  stub_node "d_concat" session d_concat
+let interpret_d_concat ~loader:_ context d_concat =
+  stub_node "d_concat" context d_concat
 
-let interpret_d_expr ~loader:_ session d_expr =
-  stub_node "d_expr" session d_expr
+let interpret_d_expr ~loader:_ context d_expr =
+  stub_node "d_expr" context d_expr
 
-let interpret_d_comp ~loader:_ session d_comp =
-  stub_node "d_comp" session d_comp
+let interpret_d_comp ~loader:_ context d_comp =
+  stub_node "d_comp" context d_comp
 
-let interpret_d_term ~loader:_ session d_term =
-  stub_node "d_term" session d_term
+let interpret_d_term ~loader:_ context d_term =
+  stub_node "d_term" context d_term
 
-let interpret_bd ~loader:_ session bd = stub_node "bd" session bd
+let interpret_bd ~loader:_ context bd = stub_node "bd" context bd
 
-let interpret_pasting ~loader:_ session pasting =
-  stub_node "pasting" session pasting
+let interpret_pasting ~loader:_ context pasting =
+  stub_node "pasting" context pasting
 
-let interpret_concat ~loader:_ session concat =
-  stub_node "concat" session concat
+let interpret_concat ~loader:_ context concat =
+  stub_node "concat" context concat
 
-let interpret_expr ~loader:_ session expr = stub_node "expr" session expr
-let interpret_name ~loader:_ session name = stub_node "name" session name
-let interpret_nat ~loader:_ session nat = stub_node "nat" session nat
+let interpret_expr ~loader:_ context expr = stub_node "expr" context expr
+let interpret_name ~loader:_ context name = stub_node "name" context name
+let interpret_nat ~loader:_ context nat = stub_node "nat" context nat
