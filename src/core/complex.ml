@@ -129,5 +129,10 @@ let local_cells_in_dim t dim =
   | None ->
       []
 
+let generator_names t =
+  t.generators.by_name |> LocalMap.bindings |> List.map fst
+
+let diagram_names t = t.diagrams |> LocalMap.bindings |> List.map fst
+let morphism_names t = t.morphisms |> LocalMap.bindings |> List.map fst
 let name_in_use t name = LocalSet.mem name t.used_names
 let used_names t = LocalSet.elements t.used_names

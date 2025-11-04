@@ -12,12 +12,8 @@ val empty : t
 
 val add_generator : t -> name:Id.Local.t -> dim:int -> tag:Id.Tag.t -> t
 val add_diagram : t -> name:Id.Local.t -> Diagram.t -> t
-
-val add_morphism :
-  t -> name:Id.Local.t -> domain:Id.Tag.t -> Morphism.t -> t
-
-val add_local_cell :
-  t -> name:Id.Local.t -> dim:int -> Diagram.cell_data -> t
+val add_morphism : t -> name:Id.Local.t -> domain:Id.Tag.t -> Morphism.t -> t
+val add_local_cell : t -> name:Id.Local.t -> dim:int -> Diagram.cell_data -> t
 
 (** {2 Lookups} *)
 val find_generator : t -> Id.Local.t -> generator_entry option
@@ -32,6 +28,9 @@ val local_cell_dim : t -> Id.Local.t -> int option
 val local_cells_in_dim : t -> int -> Id.Local.t list
 
 (** {2 Name utilities} *)
-val name_in_use : t -> Id.Local.t -> bool
+val generator_names : t -> Id.Local.t list
 
+val diagram_names : t -> Id.Local.t list
+val morphism_names : t -> Id.Local.t list
+val name_in_use : t -> Id.Local.t -> bool
 val used_names : t -> Id.Local.t list

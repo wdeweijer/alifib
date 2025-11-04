@@ -22,3 +22,6 @@ val find_cell : t -> Id.Global.t -> Diagram.cell_data option
 
 val find_type : t -> Id.Global.t -> type_entry option
 val find_module : t -> Id.Module.t -> Complex.t option
+
+(** {2 Pretty printing} *)
+val pp : Format.formatter -> t -> unit
