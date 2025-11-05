@@ -10,17 +10,26 @@ module TagTable = Hashtbl.Make (struct
         Hashtbl.hash (1, Id.Global.to_int id)
 end)
 
-type 'a checked = 'a Error.checked
+module IntMap = Map.Make (Int)
 
+type 'a checked = 'a Error.checked
 type cell_data = Diagram.cell_data
 type entry = { dim: int; cell_data: cell_data; image: Diagram.t }
-type t = { table: entry TagTable.t; cellular: bool }
+
+type t = {
+  table: entry TagTable.t;
+  cellular: bool;
+  by_dim: Id.Tag.t list IntMap.t;
+}
 
 let make_entry ~dim ~cell_data ~image = { dim; cell_data; image }
 
+let dim_bucket map dim =
+  match IntMap.find_opt dim map with Some tags -> tags | None -> []
+
 let init () =
   let table = TagTable.create 1 in
-  Ok { table; cellular= true }
+  Ok { table; cellular= true; by_dim= IntMap.empty }
 
 let domain_of_definition m =
   TagTable.fold (fun tag _ acc -> tag :: acc) m.table []
@@ -49,6 +58,18 @@ let image m tag =
       Error (Error.make "not in the domain of definition")
 
 let is_cellular m = m.cellular
+
+let domain_in_dim m dim =
+  match IntMap.find_opt dim m.by_dim with
+  | Some tags ->
+      List.rev tags
+  | None ->
+      []
+
+let dimensions m = IntMap.bindings m.by_dim |> List.map fst
+
+let domain_by_dim m =
+  IntMap.bindings m.by_dim |> List.map (fun (dim, tags) -> (dim, List.rev tags))
 
 let apply f diagram =
   let image_exn tag =
@@ -129,7 +150,11 @@ let extend f ~tag ~dim ~cell_data ~image =
     | Diagram.Zero ->
         let table = TagTable.copy f.table in
         TagTable.replace table tag (make_entry ~dim ~cell_data ~image)
-        ; Ok { table; cellular= f.cellular }
+        ; let by_dim =
+            let existing = dim_bucket f.by_dim dim in
+            IntMap.add dim (tag :: existing) f.by_dim
+          in
+          Ok { table; cellular= f.cellular; by_dim }
     | Diagram.Boundary _ ->
         assert false
   else
@@ -164,4 +189,45 @@ let extend f ~tag ~dim ~cell_data ~image =
                     TagTable.replace table tag
                       (make_entry ~dim ~cell_data ~image)
                     ; let cellular = f.cellular && Diagram.is_cell image in
-                      Ok { table; cellular }))
+                      let by_dim =
+                        let existing = dim_bucket f.by_dim dim in
+                        IntMap.add dim (tag :: existing) f.by_dim
+                      in
+                      Ok { table; cellular; by_dim }))
+
+let compose g f =
+  let initial =
+    {
+      table= TagTable.create (max 1 (TagTable.length f.table));
+      cellular= true;
+      by_dim= IntMap.empty;
+    }
+  in
+  let add_tag dim tag acc =
+    match image f tag with
+    | Error _ ->
+        acc
+    | Ok image_f_tag -> (
+        match apply g image_f_tag with
+        | Error _ ->
+            acc
+        | Ok image_gf -> (
+            match cell_data f tag with
+            | Error _ ->
+                acc
+            | Ok cell_data_f ->
+                TagTable.replace acc.table tag
+                  (make_entry ~dim ~cell_data:cell_data_f ~image:image_gf)
+                ; let by_dim =
+                    IntMap.update dim
+                      (function
+                        | None -> Some [ tag ] | Some tags -> Some (tag :: tags))
+                      acc.by_dim
+                  in
+                  let cellular = acc.cellular && Diagram.is_cell image_gf in
+                  { acc with by_dim; cellular }))
+  in
+  List.fold_left
+    (fun acc (dim, tags) ->
+      List.fold_left (fun acc tag -> add_tag dim tag acc) acc tags)
+    initial (domain_by_dim f)
