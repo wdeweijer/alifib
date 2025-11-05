@@ -23,10 +23,12 @@ let parse_args () =
   let mode = ref Interpret in
   let speclist =
     [
-      ("-o", Arg.String (fun s -> set_output s output), "Write AST to file");
+      ( "-o",
+        Arg.String (fun s -> set_output s output),
+        "Write interpreter output to file" );
       ( "--output",
         Arg.String (fun s -> set_output s output),
-        "Write output to file" );
+        "Write interpreter output to file" );
       ( "--ast",
         Arg.Unit (fun () -> mode := Ast),
         "Pretty-print the AST instead of running the interpreter" );

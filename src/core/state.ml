@@ -62,8 +62,12 @@ let pp fmt state =
   let pp_module fmt (module_id, module_complex) =
     fprintf fmt "@[<v>* Module %s" (Id.Module.to_string module_id)
     ; let generator_names = Complex.generator_names module_complex in
+      let string_or_empty name =
+        let s = Id.Local.to_string name in
+        if String.length s = 0 then "<empty>" else s
+      in
       let pp_type fmt generator_name =
-        let type_label = Id.Local.to_string generator_name in
+        let type_label = string_or_empty generator_name in
         let print_details cells diagrams morphisms =
           fprintf fmt
             "@[<v 2>Type %s@,- Cells: %s@,- Diagrams: %s@,- Morphisms: %s@]"
@@ -87,11 +91,11 @@ let pp fmt state =
                 | Some { complex= type_complex; _ } ->
                     let cells =
                       Complex.generator_names type_complex
-                      |> List.map Id.Local.to_string
+                      |> List.map string_or_empty
                     in
                     let diagrams =
                       Complex.diagram_names type_complex
-                      |> List.map Id.Local.to_string
+                      |> List.map string_or_empty
                     in
                     let morphisms =
                       Complex.morphism_names type_complex
@@ -106,14 +110,14 @@ let pp fmt state =
                                        module_complex domain
                                    with
                                    | Some domain_name ->
-                                       Id.Local.to_string domain_name
+                                       string_or_empty domain_name
                                    | None ->
                                        string_of_tag domain)
                                | None ->
                                    "?"
                              in
                              Printf.sprintf "%s :: %s"
-                               (Id.Local.to_string morph_name)
+                               (string_or_empty morph_name)
                                domain_label)
                     in
                     print_details cells diagrams morphisms))
