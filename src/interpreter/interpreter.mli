@@ -64,7 +64,10 @@ val interpret_generator_type :
   (Id.Local.t * Diagram.cell_data * Complex.t) option * result
 
 val interpret_generator :
-  context -> location:Complex.t -> Ast.generator -> result
+  context ->
+  location:Complex.t ->
+  Ast.generator ->
+  (Id.Local.t * Diagram.cell_data) option * result
 
 val interpret_boundaries :
   context -> location:Complex.t -> Ast.boundaries -> result
@@ -90,11 +93,16 @@ val interpret_dnamer :
   Ast.dnamer ->
   (Id.Local.t * Diagram.t) option * result
 
-val interpret_include : context -> Ast.include_statement -> result
+val interpret_include :
+  context -> Ast.include_statement -> (Id.Global.t * Id.Local.t) option * result
+
 val interpret_include_module : Ast.include_module -> Id.Local.t * Id.Local.t
 
 val interpret_attach :
-  context -> location:Complex.t -> Ast.attach_statement -> result
+  context ->
+  location:Complex.t ->
+  Ast.attach_statement ->
+  (Id.Local.t * Morphism.t * Complex.morphism_domain) option * result
 
 val interpret_assert :
   context -> location:Complex.t -> Ast.assert_statement -> result

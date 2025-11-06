@@ -34,7 +34,7 @@ type generators = {
 }
 
 type local_cells = {
-  by_name: local_cell_entry LocalMap.t;
+  by_id: local_cell_entry LocalMap.t;
   by_dim: LocalSet.t IntMap.t;
 }
 
@@ -54,7 +54,7 @@ let empty_generators =
     classifiers= LocalMap.empty;
   }
 
-let empty_local_cells = { by_name= LocalMap.empty; by_dim= IntMap.empty }
+let empty_local_cells = { by_id= LocalMap.empty; by_dim= IntMap.empty }
 
 let empty =
   {
@@ -103,9 +103,9 @@ let add_morphism t ~name ~domain morphism =
   { t with morphisms; used_names= LocalSet.add name t.used_names }
 
 let add_local_cell t ~name ~dim data =
-  let by_name = LocalMap.add name { data; dim } t.local_cells.by_name in
+  let by_id = LocalMap.add name { data; dim } t.local_cells.by_id in
   let by_dim = add_to_local_grade name dim t.local_cells.by_dim in
-  { t with local_cells= { by_name; by_dim } }
+  { t with local_cells= { by_id; by_dim } }
 
 let find_generator t name = LocalMap.find_opt name t.generators.by_name
 let find_generator_by_tag t tag = TagMap.find_opt tag t.generators.by_tag
@@ -127,10 +127,10 @@ let generators_in_dim t dim =
 
 let find_diagram t name = LocalMap.find_opt name t.diagrams
 let find_morphism t name = LocalMap.find_opt name t.morphisms
-let find_local_cell t name = LocalMap.find_opt name t.local_cells.by_name
+let find_local_cell t name = LocalMap.find_opt name t.local_cells.by_id
 
 let local_cell_dim t name =
-  match LocalMap.find_opt name t.local_cells.by_name with
+  match LocalMap.find_opt name t.local_cells.by_id with
   | Some entry ->
       Some entry.dim
   | None ->

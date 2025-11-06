@@ -12,20 +12,43 @@ end
 
 module GlobalMap = Map.Make (GlobalOrd)
 module ModuleMap = Map.Make (ModuleOrd)
+module GlobalSet = Set.Make (GlobalOrd)
+
+module IntOrd = struct
+  type t = int
+
+  let compare = Int.compare
+end
+
+module IntMap = Map.Make (IntOrd)
 
 type type_entry = { data: Diagram.cell_data; complex: Complex.t }
+type cell_entry = { data: Diagram.cell_data; dim: int }
+type cells = { by_id: cell_entry GlobalMap.t; by_dim: GlobalSet.t IntMap.t }
 
 type t = {
-  cells: Diagram.cell_data GlobalMap.t;
+  cells: cells;
   types: type_entry GlobalMap.t;
   modules: Complex.t ModuleMap.t;
 }
 
 let empty =
-  { cells= GlobalMap.empty; types= GlobalMap.empty; modules= ModuleMap.empty }
+  {
+    cells= { by_id= GlobalMap.empty; by_dim= IntMap.empty };
+    types= GlobalMap.empty;
+    modules= ModuleMap.empty;
+  }
 
-let add_cell state ~id data =
-  { state with cells= GlobalMap.add id data state.cells }
+let add_cell state ~id ~dim data =
+  let by_id = GlobalMap.add id { data; dim } state.cells.by_id in
+  let by_dim =
+    IntMap.update dim
+      (fun current ->
+        let set = match current with Some s -> s | None -> GlobalSet.empty in
+        Some (GlobalSet.add id set))
+      state.cells.by_dim
+  in
+  { state with cells= { by_id; by_dim } }
 
 let add_type state ~id ~data ~complex =
   { state with types= GlobalMap.add id { data; complex } state.types }
@@ -43,7 +66,7 @@ let update_type_complex state ~id complex =
 let add_module state ~id complex =
   { state with modules= ModuleMap.add id complex state.modules }
 
-let find_cell state id = GlobalMap.find_opt id state.cells
+let find_cell state id = GlobalMap.find_opt id state.cells.by_id
 let find_type state id = GlobalMap.find_opt id state.types
 let find_module state id = ModuleMap.find_opt id state.modules
 

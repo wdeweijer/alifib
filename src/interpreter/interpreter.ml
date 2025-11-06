@@ -116,7 +116,7 @@ let identity_morphism context domain =
              match tag with
              | `Global global_id -> (
                  match State.find_cell context.state global_id with
-                 | Some data ->
+                 | Some { data; _ } ->
                      data
                  | None ->
                      assert false)
@@ -534,7 +534,18 @@ let interpret_c_instr_type ~loader context
                     (Some final_location, final_result)))
 
 let interpret_c_instr context ~mode:_ ~location:_ c_instr =
-  (None, stub_node "c_instr" context c_instr)
+  let open Lang_ast in
+  match c_instr.value with
+  | C_instr_generator generator ->
+      (None, stub_node "c_instr.generator" context generator)
+  | C_instr_dnamer dnamer ->
+      (None, stub_node "c_instr.dnamer" context dnamer)
+  | C_instr_mnamer mnamer ->
+      (None, stub_node "c_instr.mnamer" context mnamer)
+  | C_instr_include include_stmt ->
+      (None, stub_node "c_instr.include" context include_stmt)
+  | C_instr_attach attach_stmt ->
+      (None, stub_node "c_instr.attach" context attach_stmt)
 
 let interpret_c_instr_local context _namespace c_instr_local =
   (None, stub_node "c_instr_local" context c_instr_local)
@@ -553,7 +564,7 @@ let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
       match tag with
       | `Global global_id -> (
           match State.find_cell context.state global_id with
-          | Some data ->
+          | Some { data; _ } ->
               data
           | None ->
               assert false)
@@ -1073,7 +1084,7 @@ and interpret_block ~loader context block =
           { context; diagnostics; status })
 
 let interpret_generator context ~location:_ generator =
-  stub_node "generator" context generator
+  (None, stub_node "generator" context generator)
 
 let interpret_boundaries context ~location:_ boundaries =
   stub_node "boundaries" context boundaries
@@ -1097,10 +1108,10 @@ let interpret_m_instr context ~location:_ m_instr =
   stub_node "m_instr" context m_instr
 
 let interpret_include context include_stmt =
-  stub_node "include" context include_stmt
+  (None, stub_node "include" context include_stmt)
 
 let interpret_attach context ~location:_ attach =
-  stub_node "attach" context attach
+  (None, stub_node "attach" context attach)
 
 let interpret_assert context ~location:_ assert_stmt =
   stub_node "assert" context assert_stmt
