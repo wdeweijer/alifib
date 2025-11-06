@@ -11,7 +11,7 @@ type local_cell_entry = { data: Diagram.cell_data; dim: int }
 (** {2 Constructors} *)
 val empty : t
 
-val add_generator : t -> name:Id.Local.t -> dim:int -> tag:Id.Tag.t -> t
+val add_generator : t -> name:Id.Local.t -> classifier:Diagram.t -> t
 val add_diagram : t -> name:Id.Local.t -> Diagram.t -> t
 
 val add_morphism :
@@ -23,6 +23,7 @@ val add_local_cell : t -> name:Id.Local.t -> dim:int -> Diagram.cell_data -> t
 val find_generator : t -> Id.Local.t -> generator_entry option
 
 val find_generator_by_tag : t -> Id.Tag.t -> Id.Local.t option
+val classifier : t -> Id.Local.t -> Diagram.t option
 val generator_dim : t -> Id.Local.t -> int option
 val generators_in_dim : t -> int -> Id.Local.t list
 val find_diagram : t -> Id.Local.t -> Diagram.t option

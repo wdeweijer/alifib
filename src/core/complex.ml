@@ -30,6 +30,7 @@ type generators = {
   by_name: generator_entry LocalMap.t;
   by_tag: Id.Local.t TagMap.t;
   by_dim: LocalSet.t IntMap.t;
+  classifiers: Diagram.t LocalMap.t;
 }
 
 type local_cells = {
@@ -46,7 +47,12 @@ type t = {
 }
 
 let empty_generators =
-  { by_name= LocalMap.empty; by_tag= TagMap.empty; by_dim= IntMap.empty }
+  {
+    by_name= LocalMap.empty;
+    by_tag= TagMap.empty;
+    by_dim= IntMap.empty;
+    classifiers= LocalMap.empty;
+  }
 
 let empty_local_cells = { by_name= LocalMap.empty; by_dim= IntMap.empty }
 
@@ -75,11 +81,17 @@ let add_to_local_grade name dim grades =
       Some (LocalSet.add name set))
     grades
 
-let add_generator t ~name ~dim ~tag =
-  let by_name = LocalMap.add name { tag; dim } t.generators.by_name in
-  let by_tag = TagMap.add tag name t.generators.by_tag in
-  let by_dim = add_to_name_grade name dim t.generators.by_dim in
-  { t with generators= { by_name; by_tag; by_dim } }
+let add_generator t ~name ~classifier =
+  let dim = Diagram.dim classifier in
+  let labels = Diagram.labels classifier in
+  let top_labels = labels.(dim) in
+  assert (Array.length top_labels > 0)
+  ; let tag = top_labels.(0) in
+    let by_name = LocalMap.add name { tag; dim } t.generators.by_name in
+    let by_tag = TagMap.add tag name t.generators.by_tag in
+    let by_dim = add_to_name_grade name dim t.generators.by_dim in
+    let classifiers = LocalMap.add name classifier t.generators.classifiers in
+    { t with generators= { by_name; by_tag; by_dim; classifiers } }
 
 let add_diagram t ~name diagram =
   let diagrams = LocalMap.add name diagram t.diagrams in
@@ -97,6 +109,7 @@ let add_local_cell t ~name ~dim data =
 
 let find_generator t name = LocalMap.find_opt name t.generators.by_name
 let find_generator_by_tag t tag = TagMap.find_opt tag t.generators.by_tag
+let classifier t name = LocalMap.find_opt name t.generators.classifiers
 
 let generator_dim t name =
   match LocalMap.find_opt name t.generators.by_name with

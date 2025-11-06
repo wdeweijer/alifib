@@ -384,7 +384,7 @@ let rec interpret_program ~loader context program =
       in
       let module_complex =
         Complex.empty
-        |> Complex.add_generator ~name:empty_name ~dim:0 ~tag:empty_type_tag
+        |> Complex.add_generator ~name:empty_name ~classifier:empty_diagram
       in
       let module_complex =
         Complex.add_diagram module_complex ~name:empty_name empty_diagram
