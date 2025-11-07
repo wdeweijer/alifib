@@ -1745,18 +1745,25 @@ and interpret_m_instr context ~location ~source ~morphism m_instr =
                 let defined_left = Morphism.is_defined_at m_left tag in
                 let defined_right = Morphism.is_defined_at m_right tag in
                 if defined_left && defined_right then
-                  match Morphism.image m_right tag with
+                  match Morphism.image m_left tag with
                   | Error err ->
                       Error err
-                  | Ok image -> (
-                      match
-                        smart_extend context_after extended_morphism ~source
-                          ~target:target_location ~tag ~dim ~diagram:image
-                      with
-                      | Ok updated ->
-                          assign updated rest
+                  | Ok left_image -> (
+                      let left_labels = Diagram.labels left_image in
+                      let tag_left = left_labels.(dim).(0) in
+                      match Morphism.image m_right tag with
                       | Error err ->
-                          Error err)
+                          Error err
+                      | Ok image -> (
+                          match
+                            smart_extend context_after extended_morphism ~source
+                              ~target:target_location ~tag:tag_left ~dim
+                              ~diagram:image
+                          with
+                          | Ok updated ->
+                              assign updated rest
+                          | Error err ->
+                              Error err))
                 else if defined_left && not defined_right then
                   let message =
                     Format.asprintf
