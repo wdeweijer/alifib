@@ -618,14 +618,362 @@ let interpret_c_instr context ~mode ~location c_instr =
                   { generator_result with context= context_updated }
                 in
                 (Some location_final, updated_result)))
-  | C_instr_dnamer dnamer ->
-      (None, stub_node "c_instr.dnamer" context dnamer)
-  | C_instr_mnamer mnamer ->
-      (None, stub_node "c_instr.mnamer" context mnamer)
-  | C_instr_include include_stmt ->
-      (None, stub_node "c_instr.include" context include_stmt)
-  | C_instr_attach attach_stmt ->
-      (None, stub_node "c_instr.attach" context attach_stmt)
+  | C_instr_dnamer dnamer -> (
+      let dnamer_output, dnamer_result =
+        interpret_dnamer context ~location dnamer
+      in
+      match dnamer_output with
+      | None ->
+          (None, dnamer_result)
+      | Some (name, diagram) ->
+          if Complex.name_in_use location name then
+            let name_span =
+              let dnamer_desc = dnamer.value in
+              Lang_ast.span_of_node dnamer_desc.dnamer_name
+            in
+            let message =
+              Format.asprintf "Diagram name already in use: %s"
+                (Id.Local.to_string name)
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer name_span message
+            in
+            (None, add_diagnostic dnamer_result diagnostic)
+          else
+            let updated_location = Complex.add_diagram location ~name diagram in
+            (Some updated_location, dnamer_result))
+  | C_instr_mnamer mnamer -> (
+      let mnamer_output, mnamer_result =
+        interpret_mnamer context ~location mnamer
+      in
+      match mnamer_output with
+      | None ->
+          (None, mnamer_result)
+      | Some (name, morphism, domain) ->
+          if Complex.name_in_use location name then
+            let name_span =
+              let mnamer_desc = mnamer.value in
+              Lang_ast.span_of_node mnamer_desc.mnamer_name
+            in
+            let message =
+              Format.asprintf "Map name already in use: %s"
+                (Id.Local.to_string name)
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer name_span message
+            in
+            (None, add_diagnostic mnamer_result diagnostic)
+          else
+            let updated_location =
+              Complex.add_morphism location ~name ~domain morphism
+            in
+            (Some updated_location, mnamer_result))
+  | C_instr_include include_stmt -> (
+      let include_output, include_result =
+        interpret_include context include_stmt
+      in
+      let context_after = include_result.context in
+      match include_output with
+      | None ->
+          (None, include_result)
+      | Some (id, name) ->
+          if Complex.name_in_use location name then
+            let include_desc = include_stmt.value in
+            let name_span =
+              match include_desc.include_alias with
+              | Some alias_node ->
+                  Lang_ast.span_of_node alias_node
+              | None ->
+                  Lang_ast.span_of_node include_stmt
+            in
+            let message =
+              Format.asprintf "Map name already in use: %s"
+                (Id.Local.to_string name)
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer name_span message
+            in
+            (None, add_diagnostic include_result diagnostic)
+          else
+            let include_resolution =
+              match State.find_type context_after.state id with
+              | None ->
+                  let type_span =
+                    match include_stmt.value.include_alias with
+                    | Some alias_node ->
+                        Lang_ast.span_of_node alias_node
+                    | None ->
+                        Lang_ast.span_of_node include_stmt
+                  in
+                  let message =
+                    Format.asprintf "Type %a not found in global record"
+                      Id.Global.pp id
+                  in
+                  let diagnostic =
+                    Diagnostics.make `Error interpreter_producer type_span
+                      message
+                  in
+                  (None, add_diagnostic include_result diagnostic)
+              | Some { complex= subtype; _ } ->
+                  let location_with_generators =
+                    List.fold_left
+                      (fun acc gen_name ->
+                        let gen_entry =
+                          match Complex.find_generator subtype gen_name with
+                          | Some entry ->
+                              entry
+                          | None ->
+                              assert false
+                        in
+                        if
+                          Option.is_some
+                            (Complex.find_generator_by_tag acc gen_entry.tag)
+                        then acc
+                        else
+                          let classifier =
+                            match Complex.classifier subtype gen_name with
+                            | Some diagram ->
+                                diagram
+                            | None ->
+                                assert false
+                          in
+                          let alias_prefix = Id.Local.to_string name in
+                          let gen_suffix = Id.Local.to_string gen_name in
+                          let combined =
+                            if String.equal alias_prefix "" then gen_suffix
+                            else if String.equal gen_suffix "" then alias_prefix
+                            else alias_prefix ^ "." ^ gen_suffix
+                          in
+                          let combined_name = Id.Local.make combined in
+                          let acc_with_generator =
+                            Complex.add_generator acc ~name:combined_name
+                              ~classifier
+                          in
+                          Complex.add_diagram acc_with_generator
+                            ~name:combined_name classifier)
+                      location
+                      (Complex.generator_names subtype)
+                  in
+                  let inclusion = identity_morphism context_after subtype in
+                  let final_location =
+                    Complex.add_morphism location_with_generators ~name
+                      ~domain:(Complex.Type id) inclusion
+                  in
+                  let final_result =
+                    { include_result with context= context_after }
+                  in
+                  (Some final_location, final_result)
+            in
+            include_resolution)
+  | C_instr_attach attach_stmt -> (
+      let attach_output, attach_result =
+        interpret_attach context ~location attach_stmt
+      in
+      let context_after = attach_result.context in
+      match attach_output with
+      | None ->
+          (None, attach_result)
+      | Some (name, morphism, domain) ->
+          if Complex.name_in_use location name then
+            let name_span =
+              let attach_desc = attach_stmt.value in
+              Lang_ast.span_of_node attach_desc.attach_name
+            in
+            let message =
+              Format.asprintf "Map name already in use: %s"
+                (Id.Local.to_string name)
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer name_span message
+            in
+            (None, add_diagnostic attach_result diagnostic)
+          else
+            let attachment_id =
+              match domain with
+              | Complex.Type id ->
+                  id
+              | Complex.Module _ ->
+                  assert false
+            in
+            let attach_resolution =
+              match State.find_type context_after.state attachment_id with
+              | None ->
+                  let name_span =
+                    Lang_ast.span_of_node attach_stmt.value.attach_name
+                  in
+                  let message =
+                    Format.asprintf "Type %a not found in global record"
+                      Id.Global.pp attachment_id
+                  in
+                  let diagnostic =
+                    Diagnostics.make `Error interpreter_producer name_span
+                      message
+                  in
+                  (None, add_diagnostic attach_result diagnostic)
+              | Some { complex= attachment; _ } ->
+                  let attachment_generators =
+                    Complex.generator_names attachment
+                    |> List.filter_map (fun gen_name ->
+                           match Complex.find_generator attachment gen_name with
+                           | Some entry ->
+                               Some (entry.dim, gen_name, entry.tag)
+                           | None ->
+                               None)
+                    |> List.sort (fun (dim_a, _, _) (dim_b, _, _) ->
+                           Int.compare dim_a dim_b)
+                  in
+                  let initial_entries =
+                    Morphism.domain_of_definition morphism
+                    |> List.map (fun tag ->
+                           let dim =
+                             match Morphism.dim morphism tag with
+                             | Ok d ->
+                                 d
+                             | Error _ ->
+                                 assert false
+                           in
+                           let cell_data =
+                             match Morphism.cell_data morphism tag with
+                             | Ok data ->
+                                 data
+                             | Error _ ->
+                                 assert false
+                           in
+                           let image =
+                             match Morphism.image morphism tag with
+                             | Ok diagram ->
+                                 diagram
+                             | Error _ ->
+                                 assert false
+                           in
+                           (tag, dim, cell_data, image))
+                  in
+                  let initial_cellular = Morphism.is_cellular morphism in
+                  let location_after, state_after, _, _, morphism_after =
+                    List.fold_left
+                      (fun (loc, state, entries, cellular, current_morphism)
+                           (gen_dim, gen_name, gen_tag) ->
+                        if Morphism.is_defined_at current_morphism gen_tag then
+                          (loc, state, entries, cellular, current_morphism)
+                        else
+                          let gen_cell_data =
+                            match gen_tag with
+                            | `Global gen_id -> (
+                                match State.find_cell state gen_id with
+                                | Some { data; _ } ->
+                                    data
+                                | None ->
+                                    assert false)
+                            | `Local _ ->
+                                assert false
+                          in
+                          let image_cell_data =
+                            match gen_cell_data with
+                            | Diagram.Zero ->
+                                Diagram.Zero
+                            | Diagram.Boundary { boundary_in; boundary_out } ->
+                                let image_in =
+                                  match
+                                    Morphism.apply current_morphism boundary_in
+                                  with
+                                  | Ok diagram ->
+                                      diagram
+                                  | Error _ ->
+                                      assert false
+                                in
+                                let image_out =
+                                  match
+                                    Morphism.apply current_morphism boundary_out
+                                  with
+                                  | Ok diagram ->
+                                      diagram
+                                  | Error _ ->
+                                      assert false
+                                in
+                                Diagram.Boundary
+                                  {
+                                    boundary_in= image_in;
+                                    boundary_out= image_out;
+                                  }
+                          in
+                          let base_name = Id.Local.to_string name in
+                          let gen_name_str = Id.Local.to_string gen_name in
+                          let combined =
+                            if String.equal base_name "" then gen_name_str
+                            else if String.equal gen_name_str "" then base_name
+                            else base_name ^ "." ^ gen_name_str
+                          in
+                          let image_name = Id.Local.make combined in
+                          let image_tag, state_after_cells, loc_with_cells =
+                            match mode with
+                            | Global ->
+                                let image_id = Id.Global.fresh () in
+                                let state' =
+                                  State.add_cell state ~id:image_id ~dim:gen_dim
+                                    image_cell_data
+                                in
+                                (Id.Tag.of_global image_id, state', loc)
+                            | Local ->
+                                let loc' =
+                                  Complex.add_local_cell loc ~name:image_name
+                                    ~dim:gen_dim image_cell_data
+                                in
+                                (Id.Tag.of_local image_name, state, loc')
+                          in
+                          let image_classifier =
+                            match Diagram.cell image_tag image_cell_data with
+                            | Ok diagram ->
+                                diagram
+                            | Error _ ->
+                                assert false
+                          in
+                          let loc_with_generator =
+                            let loc_with_gen =
+                              Complex.add_generator loc_with_cells
+                                ~name:image_name ~classifier:image_classifier
+                            in
+                            Complex.add_diagram loc_with_gen ~name:image_name
+                              image_classifier
+                          in
+                          let new_entry =
+                            (gen_tag, gen_dim, gen_cell_data, image_classifier)
+                          in
+                          let entries' = new_entry :: entries in
+                          let extended_morphism =
+                            Morphism.of_entries entries' ~cellular
+                          in
+                          ( loc_with_generator,
+                            state_after_cells,
+                            entries',
+                            cellular,
+                            extended_morphism ))
+                      ( location,
+                        context_after.state,
+                        initial_entries,
+                        initial_cellular,
+                        morphism )
+                      attachment_generators
+                  in
+                  let final_location =
+                    Complex.add_morphism location_after ~name ~domain
+                      morphism_after
+                  in
+                  let final_state =
+                    match mode with
+                    | Global ->
+                        let module_id = context_after.current_module in
+                        State.add_module state_after ~id:module_id
+                          final_location
+                    | Local ->
+                        state_after
+                  in
+                  let final_context = with_state context_after final_state in
+                  let final_result =
+                    { attach_result with context= final_context }
+                  in
+                  (Some final_location, final_result)
+            in
+            attach_resolution)
 
 let interpret_c_block context ~mode ~location (c_block : Lang_ast.c_block) =
   let instrs = c_block.value in
