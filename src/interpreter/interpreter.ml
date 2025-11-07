@@ -122,7 +122,7 @@ let identity_morphism context domain =
   in
   Morphism.of_entries entries ~cellular:true
 
-let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
+let rec smart_extend context morphism ~source ~target ~tag ~dim ~diagram =
   let error msg = Error.make msg in
   if Morphism.is_defined_at morphism tag then
     match Morphism.image morphism tag with
@@ -141,7 +141,7 @@ let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
           | None ->
               assert false)
       | `Local name -> (
-          match Complex.find_local_cell domain name with
+          match Complex.find_local_cell source name with
           | Some { data; _ } ->
               data
           | None ->
@@ -199,7 +199,7 @@ let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
             | Ok (boundary_diag, target_boundary) -> (
                 if Diagram.is_cell boundary_diag then
                   match
-                    smart_extend context partial ~domain ~codomain ~tag:focus
+                    smart_extend context partial ~source ~target ~tag:focus
                       ~dim:dim_minus_one ~diagram:target_boundary
                   with
                   | Error _ as err ->
@@ -275,7 +275,7 @@ let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
                           | Ok image_focus -> (
                               let generator_name =
                                 match
-                                  Complex.find_generator_by_tag codomain
+                                  Complex.find_generator_by_tag target
                                     image_focus
                                 with
                                 | Some name ->
@@ -285,7 +285,7 @@ let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
                               in
                               let d_focus =
                                 match
-                                  Complex.classifier codomain generator_name
+                                  Complex.classifier target generator_name
                                 with
                                 | Some diagram ->
                                     diagram
@@ -293,7 +293,7 @@ let rec smart_extend context morphism ~domain ~codomain ~tag ~dim ~diagram =
                                     assert false
                               in
                               match
-                                smart_extend context partial ~domain ~codomain
+                                smart_extend context partial ~source ~target
                                   ~tag:focus ~dim:dim_minus_one ~diagram:d_focus
                               with
                               | Error _ as err ->
@@ -430,7 +430,40 @@ let interpret_address context address =
                               assert false)))))
 
 let interpret_include context include_stmt =
-  (None, stub_node "include" context include_stmt)
+  let open Lang_ast in
+  let include_desc = include_stmt.value in
+  let address_node = include_desc.include_address in
+  let address_output, address_result = interpret_address context address_node in
+  match address_output with
+  | None ->
+      (None, address_result)
+  | Some id -> (
+      match include_desc.include_alias with
+      | Some alias_node ->
+          let alias = interpret_name alias_node in
+          (Some (id, alias), address_result)
+      | None -> (
+          let module_id = context.current_module in
+          match State.find_module context.state module_id with
+          | None ->
+              assert false
+          | Some module_complex -> (
+              let tag = Id.Tag.of_global id in
+              match Complex.find_generator_by_tag module_complex tag with
+              | None ->
+                  assert false
+              | Some generator_name ->
+                  let name_str = Id.Local.to_string generator_name in
+                  if String.contains name_str '.' then
+                    let span = Lang_ast.span_of_node include_stmt in
+                    let message =
+                      "Inclusion of non-local types requires an alias"
+                    in
+                    let diagnostic =
+                      Diagnostics.make `Error interpreter_producer span message
+                    in
+                    (None, add_diagnostic address_result diagnostic)
+                  else (Some (id, generator_name), address_result))))
 
 let interpret_include_module (include_mod : Lang_ast.include_module) =
   let include_desc = include_mod.value in
@@ -453,16 +486,16 @@ let interpret_m_comp context ~location:_ m_comp =
 let interpret_m_term context ~location:_ m_term =
   (None, stub_node "m_term" context m_term)
 
-let interpret_m_ext context ~location:_ m_ext =
+let interpret_m_ext context ~location:_ ~source:_ m_ext =
   (None, stub_node "m_ext" context m_ext)
 
-let interpret_m_def context ~location:_ m_def =
+let interpret_m_def context ~location:_ ~source:_ m_def =
   (None, stub_node "m_def" context m_def)
 
-let interpret_m_block context ~location:_ m_block =
+let interpret_m_block context ~location:_ ~source:_ m_block =
   (None, stub_node "m_block" context m_block)
 
-let interpret_m_instr context ~location:_ m_instr =
+let interpret_m_instr context ~location:_ ~source:_ m_instr =
   (None, stub_node "m_instr" context m_instr)
 
 let interpret_diagram context ~location:_ diagram =
@@ -489,14 +522,113 @@ let interpret_concat context ~location:_ concat =
 let interpret_expr context ~location:_ expr =
   (None, stub_node "expr" context expr)
 
-let interpret_boundaries context ~location:_ boundaries =
-  (None, stub_node "boundaries" context boundaries)
+let interpret_boundaries context ~location boundaries =
+  let open Lang_ast in
+  let { value= boundaries_desc; _ } = boundaries in
+  let source_node = boundaries_desc.boundaries_source in
+  let target_node = boundaries_desc.boundaries_target in
+  let boundary_in_opt, source_result =
+    interpret_diagram context ~location source_node
+  in
+  match boundary_in_opt with
+  | None ->
+      (None, source_result)
+  | Some boundary_in -> (
+      let boundary_out_opt, target_result =
+        interpret_diagram source_result.context ~location target_node
+      in
+      let combined_result = combine source_result target_result in
+      match boundary_out_opt with
+      | None ->
+          (None, combined_result)
+      | Some boundary_out ->
+          ( Some (Diagram.Boundary { boundary_in; boundary_out }),
+            combined_result ))
 
-let interpret_dnamer context ~location:_ dnamer =
-  (None, stub_node "dnamer" context dnamer)
+let interpret_dnamer context ~location dnamer =
+  let open Lang_ast in
+  let dnamer_desc = dnamer.value in
+  let diagram_opt, diagram_result =
+    interpret_diagram context ~location dnamer_desc.dnamer_body
+  in
+  match diagram_opt with
+  | None ->
+      (None, diagram_result)
+  | Some diagram -> (
+      let name = interpret_name dnamer_desc.dnamer_name in
+      let context_after = diagram_result.context in
+      match dnamer_desc.dnamer_boundaries with
+      | None ->
+          (Some (name, diagram), diagram_result)
+      | Some boundaries_node -> (
+          let boundaries_opt, boundaries_result =
+            interpret_boundaries context_after ~location boundaries_node
+          in
+          let combined_result = combine diagram_result boundaries_result in
+          match boundaries_opt with
+          | None ->
+              (None, combined_result)
+          | Some boundaries -> (
+              match boundaries with
+              | Diagram.Zero ->
+                  assert false
+              | Diagram.Boundary { boundary_in; boundary_out } ->
+                  let boundary_span = Lang_ast.span_of_node boundaries_node in
+                  let boundary_idx = Diagram.dim diagram - 1 in
+                  let boundary_error kind =
+                    let message =
+                      match kind with
+                      | `Input ->
+                          "Diagram does not match input boundary annotation"
+                      | `Output ->
+                          "Diagram does not match output boundary annotation"
+                    in
+                    let diagnostic =
+                      Diagnostics.make `Error interpreter_producer boundary_span
+                        message
+                    in
+                    (None, add_diagnostic combined_result diagnostic)
+                  in
+                  if boundary_idx < 0 then boundary_error `Input
+                  else
+                    let input_boundary =
+                      Diagram.boundary_normal `Input boundary_idx diagram
+                    in
+                    if not (Diagram.isomorphic input_boundary boundary_in) then
+                      boundary_error `Input
+                    else
+                      let output_boundary =
+                        Diagram.boundary_normal `Output boundary_idx diagram
+                      in
+                      if not (Diagram.isomorphic output_boundary boundary_out)
+                      then boundary_error `Output
+                      else (Some (name, diagram), combined_result))))
 
-let interpret_mnamer context ~location:_ mnamer =
-  (None, stub_node "mnamer" context mnamer)
+let interpret_mnamer context ~location mnamer =
+  let open Lang_ast in
+  let mnamer_desc = mnamer.value in
+  let address_node = mnamer_desc.mnamer_address in
+  let address_output, address_result = interpret_address context address_node in
+  match address_output with
+  | None ->
+      (None, address_result)
+  | Some id -> (
+      let context_after = address_result.context in
+      let state = context_after.state in
+      match State.find_type state id with
+      | None ->
+          assert false
+      | Some { complex= source; _ } -> (
+          let m_def_node = mnamer_desc.mnamer_definition in
+          let m_def_output, m_def_result =
+            interpret_m_def context_after ~location ~source m_def_node
+          in
+          match m_def_output with
+          | None ->
+              (None, m_def_result)
+          | Some morphism ->
+              let name = interpret_name mnamer_desc.mnamer_name in
+              (Some (name, morphism, Complex.Type id), m_def_result)))
 
 let interpret_generator context ~location generator =
   let open Lang_ast in
@@ -516,11 +648,88 @@ let interpret_generator context ~location generator =
   | None ->
       (Some (name, Diagram.Zero), empty_result context)
 
-let interpret_attach context ~location:_ attach =
-  (None, stub_node "attach" context attach)
+let interpret_attach context ~location attach =
+  let open Lang_ast in
+  let attach_desc = attach.value in
+  let address_node = attach_desc.attach_address in
+  let address_output, address_result = interpret_address context address_node in
+  match address_output with
+  | None ->
+      (None, address_result)
+  | Some id -> (
+      let context_after = address_result.context in
+      let name = interpret_name attach_desc.attach_name in
+      match attach_desc.attach_along with
+      | None -> (
+          match Morphism.init () with
+          | Error _ ->
+              assert false
+          | Ok morphism ->
+              (Some (name, morphism, Complex.Type id), address_result))
+      | Some m_def_node -> (
+          let state = context_after.state in
+          let source =
+            match State.find_type state id with
+            | Some { complex; _ } ->
+                complex
+            | None ->
+                assert false
+          in
+          let m_def_output, m_def_result =
+            interpret_m_def context_after ~location ~source m_def_node
+          in
+          match m_def_output with
+          | None ->
+              (None, m_def_result)
+          | Some morphism ->
+              (Some (name, morphism, Complex.Type id), m_def_result)))
 
-let interpret_assert context ~location:_ assert_stmt =
-  (None, stub_node "assert" context assert_stmt)
+let interpret_assert context ~location assert_stmt =
+  let Lang_ast.{ value= assert_desc; _ } = assert_stmt in
+  let Lang_ast.{ assert_left= left_pasting; assert_right= right_pasting } =
+    assert_desc
+  in
+  let left_term_opt, left_result =
+    interpret_pasting context ~location left_pasting
+  in
+  match left_term_opt with
+  | None ->
+      (None, left_result)
+  | Some term_left -> (
+      let right_term_opt, right_result =
+        interpret_pasting left_result.context ~location right_pasting
+      in
+      let combined_result = combine left_result right_result in
+      match right_term_opt with
+      | None ->
+          (None, combined_result)
+      | Some term_right -> (
+          match (term_left, term_right) with
+          | D_term d_left, D_term d_right ->
+              (Some (D_term_pair { fst= d_left; snd= d_right }), combined_result)
+          | ( M_term { morphism= m_left; source= source_left },
+              M_term { morphism= m_right; source= source_right } ) ->
+              if source_left == source_right then
+                ( Some
+                    (M_term_pair
+                       { fst= m_left; snd= m_right; source= source_left }),
+                  combined_result )
+              else
+                let span = Lang_ast.span_of_node assert_stmt in
+                let message =
+                  "The two sides of the equation are incomparable"
+                in
+                let diagnostic =
+                  Diagnostics.make `Error interpreter_producer span message
+                in
+                (None, add_diagnostic combined_result diagnostic)
+          | _ ->
+              let span = Lang_ast.span_of_node assert_stmt in
+              let message = "The two sides of the equation are incomparable" in
+              let diagnostic =
+                Diagnostics.make `Error interpreter_producer span message
+              in
+              (None, add_diagnostic combined_result diagnostic)))
 
 let interpret_c_instr_local context namespace c_instr_local =
   let { root; location } = namespace in

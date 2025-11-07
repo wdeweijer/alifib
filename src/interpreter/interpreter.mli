@@ -103,16 +103,32 @@ val interpret_m_term :
   morphism_component option * result
 
 val interpret_m_ext :
-  context -> location:Complex.t -> Ast.m_ext -> Morphism.t option * result
+  context ->
+  location:Complex.t ->
+  source:Complex.t ->
+  Ast.m_ext ->
+  Morphism.t option * result
 
 val interpret_m_def :
-  context -> location:Complex.t -> Ast.m_def -> Morphism.t option * result
+  context ->
+  location:Complex.t ->
+  source:Complex.t ->
+  Ast.m_def ->
+  Morphism.t option * result
 
 val interpret_m_block :
-  context -> location:Complex.t -> Ast.m_block -> Morphism.t option * result
+  context ->
+  location:Complex.t ->
+  source:Complex.t ->
+  Ast.m_block ->
+  Morphism.t option * result
 
 val interpret_m_instr :
-  context -> location:Complex.t -> Ast.m_instr -> Morphism.t option * result
+  context ->
+  location:Complex.t ->
+  source:Complex.t ->
+  Ast.m_instr ->
+  Morphism.t option * result
 
 val interpret_mnamer :
   context ->
