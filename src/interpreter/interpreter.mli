@@ -16,6 +16,14 @@ type mode = Global | Local
 type namespace = { root: Id.Global.t; location: Complex.t }
 type status = [ `Ok | `Error ]
 
+type term =
+  | M_term of { morphism: Morphism.t; source: Complex.t }
+  | D_term of Diagram.t
+
+type term_pair =
+  | M_term_pair of { fst: Morphism.t; snd: Morphism.t; source: Complex.t }
+  | D_term_pair of { fst: Diagram.t; snd: Diagram.t }
+
 type result = {
   context: context;
   diagnostics: Diagnostics.report;
@@ -105,7 +113,10 @@ val interpret_attach :
   (Id.Local.t * Morphism.t * Complex.morphism_domain) option * result
 
 val interpret_assert :
-  context -> location:Complex.t -> Ast.assert_statement -> result
+  context ->
+  location:Complex.t ->
+  Ast.assert_statement ->
+  term_pair option * result
 
 val interpret_diagram : context -> location:Complex.t -> Ast.diagram -> result
 val interpret_d_concat : context -> location:Complex.t -> Ast.d_concat -> result
@@ -113,8 +124,16 @@ val interpret_d_expr : context -> location:Complex.t -> Ast.d_expr -> result
 val interpret_d_comp : context -> location:Complex.t -> Ast.d_comp -> result
 val interpret_d_term : context -> location:Complex.t -> Ast.d_term -> result
 val interpret_bd : Ast.bd -> Diagram.sign
-val interpret_pasting : context -> location:Complex.t -> Ast.pasting -> result
-val interpret_concat : context -> location:Complex.t -> Ast.concat -> result
-val interpret_expr : context -> location:Complex.t -> Ast.expr -> result
+val interpret_pasting :
+  context ->
+  location:Complex.t ->
+  Ast.pasting ->
+  term option * result
+
+val interpret_concat :
+  context -> location:Complex.t -> Ast.concat -> term option * result
+
+val interpret_expr :
+  context -> location:Complex.t -> Ast.expr -> term option * result
 val interpret_name : Ast.name -> Id.Local.t
 val interpret_nat : Ast.nat -> int

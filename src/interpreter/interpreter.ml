@@ -17,6 +17,15 @@ type file_loader = {
 type mode = Global | Local
 type namespace = { root: Id.Global.t; location: Complex.t }
 type status = [ `Ok | `Error ]
+
+type term =
+  | M_term of { morphism: Morphism.t; source: Complex.t }
+  | D_term of Diagram.t
+
+type term_pair =
+  | M_term_pair of { fst: Morphism.t; snd: Morphism.t; source: Complex.t }
+  | D_term_pair of { fst: Diagram.t; snd: Diagram.t }
+
 type result = { context: context; diagnostics: Report.t; status: status }
 
 let empty_result context = { context; diagnostics= Report.empty; status= `Ok }
@@ -470,12 +479,13 @@ let interpret_d_term context ~location:_ d_term =
   stub_node "d_term" context d_term
 
 let interpret_pasting context ~location:_ pasting =
-  stub_node "pasting" context pasting
+  (None, stub_node "pasting" context pasting)
 
 let interpret_concat context ~location:_ concat =
-  stub_node "concat" context concat
+  (None, stub_node "concat" context concat)
 
-let interpret_expr context ~location:_ expr = stub_node "expr" context expr
+let interpret_expr context ~location:_ expr =
+  (None, stub_node "expr" context expr)
 
 let interpret_boundaries context ~location:_ boundaries =
   stub_node "boundaries" context boundaries
@@ -493,10 +503,176 @@ let interpret_attach context ~location:_ attach =
   (None, stub_node "attach" context attach)
 
 let interpret_assert context ~location:_ assert_stmt =
-  stub_node "assert" context assert_stmt
+  (None, stub_node "assert" context assert_stmt)
 
-let interpret_c_instr_local context _namespace c_instr_local =
-  (None, stub_node "c_instr_local" context c_instr_local)
+let interpret_c_instr_local context namespace c_instr_local =
+  let { root; location } = namespace in
+  let root_location =
+    match State.find_type context.state root with
+    | Some { complex; _ } ->
+        complex
+    | None ->
+        assert false
+  in
+  let Lang_ast.{ value= instr_desc; _ } = c_instr_local in
+  match instr_desc with
+  | Lang_ast.C_instr_local_dnamer dnamer -> (
+      let dnamer_output, dnamer_result =
+        interpret_dnamer context ~location dnamer
+      in
+      let context_after = dnamer_result.context in
+      match dnamer_output with
+      | None ->
+          (None, dnamer_result)
+      | Some (name, diagram) ->
+          if Complex.name_in_use location name then
+            let name_span =
+              let dnamer_desc = dnamer.value in
+              Lang_ast.span_of_node dnamer_desc.dnamer_name
+            in
+            let message =
+              Format.asprintf "Diagram name already in use: %s"
+                (Id.Local.to_string name)
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer name_span message
+            in
+            (None, add_diagnostic dnamer_result diagnostic)
+          else
+            let updated_location = Complex.add_diagram location ~name diagram in
+            let updated_root_location =
+              Complex.add_diagram root_location ~name diagram
+            in
+            let state_with_root =
+              State.update_type_complex context_after.state ~id:root
+                updated_root_location
+            in
+            let context_updated = with_state context_after state_with_root in
+            let updated_result =
+              { dnamer_result with context= context_updated }
+            in
+            (Some updated_location, updated_result))
+  | Lang_ast.C_instr_local_mnamer mnamer -> (
+      let mnamer_output, mnamer_result =
+        interpret_mnamer context ~location mnamer
+      in
+      let context_after = mnamer_result.context in
+      match mnamer_output with
+      | None ->
+          (None, mnamer_result)
+      | Some (name, morphism, domain) ->
+          if Complex.name_in_use location name then
+            let name_span =
+              let mnamer_desc = mnamer.value in
+              Lang_ast.span_of_node mnamer_desc.mnamer_name
+            in
+            let message =
+              Format.asprintf "Map name already in use: %s"
+                (Id.Local.to_string name)
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer name_span message
+            in
+            (None, add_diagnostic mnamer_result diagnostic)
+          else
+            let updated_location =
+              Complex.add_morphism location ~name ~domain morphism
+            in
+            let updated_root_location =
+              Complex.add_morphism root_location ~name ~domain morphism
+            in
+            let state_with_root =
+              State.update_type_complex context_after.state ~id:root
+                updated_root_location
+            in
+            let context_updated = with_state context_after state_with_root in
+            let updated_result =
+              { mnamer_result with context= context_updated }
+            in
+            (Some updated_location, updated_result))
+  | Lang_ast.C_instr_local_assert assert_stmt -> (
+      let term_pair_opt, assert_result =
+        interpret_assert context ~location assert_stmt
+      in
+      let span = Lang_ast.span_of_node assert_stmt in
+      match term_pair_opt with
+      | None ->
+          (None, assert_result)
+      | Some term_pair -> (
+          match term_pair with
+          | M_term_pair record -> (
+              let fst = record.fst in
+              let snd = record.snd in
+              let source = record.source in
+              let generators =
+                Complex.generator_names source
+                |> List.filter_map (fun gen_name ->
+                       match Complex.find_generator source gen_name with
+                       | Some entry ->
+                           Some (entry.dim, gen_name, entry.tag)
+                       | None ->
+                           None)
+                |> List.sort (fun (dim_a, _, _) (dim_b, _, _) ->
+                       Int.compare dim_a dim_b)
+              in
+              let rec check_generators = function
+                | [] ->
+                    None
+                | (_, gen_name, tag) :: rest ->
+                    let in_first = Morphism.is_defined_at fst tag in
+                    let in_second = Morphism.is_defined_at snd tag in
+                    let name_str = Id.Local.to_string gen_name in
+                    if in_first && not in_second then
+                      Some
+                        (Format.asprintf
+                           "%s is in the domain of definition of the first \
+                            map, but not the second map"
+                           name_str)
+                    else if in_second && not in_first then
+                      Some
+                        (Format.asprintf
+                           "%s is in the domain of definition of the second \
+                            map, but not the first map"
+                           name_str)
+                    else if in_first then
+                      let image_first =
+                        match Morphism.image fst tag with
+                        | Ok diagram ->
+                            diagram
+                        | Error _ ->
+                            assert false
+                      in
+                      let image_second =
+                        match Morphism.image snd tag with
+                        | Ok diagram ->
+                            diagram
+                        | Error _ ->
+                            assert false
+                      in
+                      if Diagram.isomorphic image_first image_second then
+                        check_generators rest
+                      else
+                        Some (Format.asprintf "The maps differ on %s" name_str)
+                    else check_generators rest
+              in
+              match check_generators generators with
+              | None ->
+                  (None, assert_result)
+              | Some message ->
+                  let diagnostic =
+                    Diagnostics.make `Error interpreter_producer span message
+                  in
+                  (None, add_diagnostic assert_result diagnostic))
+          | D_term_pair record ->
+              let fst = record.fst in
+              let snd = record.snd in
+              if Diagram.isomorphic fst snd then (None, assert_result)
+              else
+                let message = "The diagrams are not equal" in
+                let diagnostic =
+                  Diagnostics.make `Error interpreter_producer span message
+                in
+                (None, add_diagnostic assert_result diagnostic)))
 
 let interpret_c_block_local context namespace
     (c_block_local : Lang_ast.c_block_local) =
