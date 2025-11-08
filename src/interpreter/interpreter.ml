@@ -1799,7 +1799,7 @@ and interpret_c_instr context ~mode ~location c_instr =
                            (tag, dim, cell_data, image))
                   in
                   let initial_cellular = Morphism.is_cellular morphism in
-                  let location_after, state_after, _, _, morphism_after =
+                  let location_after, final_state, _, _, morphism_after =
                     List.fold_left
                       (fun (loc, state, entries, cellular, current_morphism)
                            (gen_dim, gen_name, gen_tag) ->
@@ -1903,15 +1903,6 @@ and interpret_c_instr context ~mode ~location c_instr =
                   let final_location =
                     Complex.add_morphism location_after ~name ~domain
                       morphism_after
-                  in
-                  let final_state =
-                    match mode with
-                    | Global ->
-                        let module_id = context_after.current_module in
-                        State.add_module state_after ~id:module_id
-                          final_location
-                    | Local ->
-                        state_after
                   in
                   let final_context = with_state context_after final_state in
                   let final_result =

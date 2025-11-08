@@ -261,7 +261,7 @@ let paste n u v =
           else
             let t_u = tree_u sign k in
             let t_v = tree_v sign k in
-            Paste_tree.Node (k, t_u, t_v)
+            Paste_tree.Node (n, t_u, t_v)
         in
         Ok { shape= shape_uv; labels= labels_uv; tree= tree_fn }
 

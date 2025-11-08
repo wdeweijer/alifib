@@ -139,17 +139,23 @@ let apply f diagram =
         (* Fall back to rebuilding via the paste tree *)
         let rec f_tree = function
           | Diagram.Paste_tree.Leaf tag ->
-              image_exn tag
+              Ok (image_exn tag)
           | Diagram.Paste_tree.Node (k, t1, t2) -> (
-              let d1 = f_tree t1 in
-              let d2 = f_tree t2 in
-              match Diagram.paste k d1 d2 with
-              | Ok d ->
-                  d
-              | Error _ ->
-                  assert false)
+              match f_tree t1 with
+              | Error _ as err ->
+                  err
+              | Ok d1 -> (
+                  match f_tree t2 with
+                  | Error _ as err ->
+                      err
+                  | Ok d2 -> (
+                      match Diagram.paste k d1 d2 with
+                      | Ok d ->
+                          Ok d
+                      | Error err ->
+                          Error err)))
         in
-        Ok (f_tree root_tree)
+        f_tree root_tree
 
 let extend f ~tag ~dim ~cell_data ~image =
   if is_defined_at f tag then Error (Error.make "already defined")

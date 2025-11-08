@@ -80,11 +80,17 @@ let equal (a : t) (b : t) : bool =
     if not dims_equal then false
     else
       let rec eq_level arr1 arr2 idx =
-        if idx = Array.length arr1 then true
+        let len1 = Array.length arr1 in
+        let len2 = Array.length arr2 in
+        if len1 <> len2 then false
+        else if idx = len1 then true
         else IntSet.equal arr1.(idx) arr2.(idx) && eq_level arr1 arr2 (idx + 1)
       in
       let rec eq_family fam1 fam2 d =
-        if d = Array.length fam1 then true
+        let len1 = Array.length fam1 in
+        let len2 = Array.length fam2 in
+        if len1 <> len2 then false
+        else if d = len1 then true
         else eq_level fam1.(d) fam2.(d) 0 && eq_family fam1 fam2 (d + 1)
       in
       eq_family a.faces_in b.faces_in 0 && eq_family a.faces_out b.faces_out 0
@@ -473,7 +479,7 @@ let traverse (g : t) (initial_stack : (int * intset) list) : t * Embedding.t =
                               else if order = best_order && q < best_q then
                                 Some (order, q)
                               else acc)
-                      focus_input None
+                      focus_in None
                   in
                   match candidate with
                   | Some (_, q) ->
