@@ -1562,13 +1562,8 @@ and interpret_c_instr context ~mode ~location c_instr =
                 let state_after =
                   match (mode, new_id_opt) with
                   | Global, Some new_id ->
-                      let state_with_cell =
-                        State.add_cell context_after.state ~id:new_id ~dim
-                          boundaries
-                      in
-                      let module_id = context_after.current_module in
-                      State.add_module state_with_cell ~id:module_id
-                        location_final
+                      State.add_cell context_after.state ~id:new_id ~dim
+                          boundaries                      
                   | _ ->
                       context_after.state
                 in
