@@ -18,6 +18,7 @@ val intset_empty : intset
 val intset_add : int -> intset -> intset
 val intset_of_list : int list -> intset
 val intset_of_array : int array -> intset
+val intset_elements : intset -> int list
 
 (** {2 Constructors} *)
 val make :

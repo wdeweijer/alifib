@@ -34,6 +34,8 @@ let intset_of_list lst =
 let intset_of_array arr =
   Array.fold_left (fun acc x -> IntSet.add x acc) IntSet.empty arr
 
+let intset_elements set = IntSet.elements set
+
 let empty =
   {
     dim= -1;
@@ -462,23 +464,25 @@ let traverse (g : t) (initial_stack : (int * intset) list) : t * Embedding.t =
                   let candidate =
                     IntSet.fold
                       (fun x acc ->
-                        let cofaces = g.cofaces_in.(dim - 1).(x) in
-                        let unmarked =
-                          cofaces |> IntSet.inter focus
-                          |> IntSet.filter (fun q -> inv.(dim).(q) < 0)
-                        in
-                        if IntSet.is_empty unmarked then acc
+                        let order = inv.(dim - 1).(x) in
+                        if order < 0 then acc
                         else
-                          let order = inv.(dim - 1).(x) in
-                          let q = IntSet.min_elt unmarked in
-                          match acc with
-                          | None ->
-                              Some (order, q)
-                          | Some (best_order, best_q) ->
-                              if order < best_order then Some (order, q)
-                              else if order = best_order && q < best_q then
+                          let cofaces = g.cofaces_in.(dim - 1).(x) in
+                          let unmarked =
+                            cofaces |> IntSet.inter focus
+                            |> IntSet.filter (fun q -> inv.(dim).(q) < 0)
+                          in
+                          if IntSet.is_empty unmarked then acc
+                          else
+                            let q = IntSet.min_elt unmarked in
+                            match acc with
+                            | None ->
                                 Some (order, q)
-                              else acc)
+                            | Some (best_order, best_q) ->
+                                if order < best_order then Some (order, q)
+                                else if order = best_order && q < best_q then
+                                  Some (order, q)
+                                else acc)
                       focus_in None
                   in
                   match candidate with
