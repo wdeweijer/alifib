@@ -1326,6 +1326,16 @@ and interpret_c_instr_local context namespace c_instr_local =
               Diagnostics.make `Error interpreter_producer name_span message
             in
             (None, add_diagnostic dnamer_result diagnostic)
+          else if Diagram.has_local_labels diagram then
+            let diagram_span =
+              let dnamer_desc = dnamer.value in
+              Lang_ast.span_of_node dnamer_desc.dnamer_body
+            in
+            let diagnostic =
+              Diagnostics.make `Error interpreter_producer diagram_span
+                "Named diagrams must contain only global cells"
+            in
+            (None, add_diagnostic dnamer_result diagnostic)
           else
             let updated_location = Complex.add_diagram location ~name diagram in
             let updated_root_location =
@@ -1363,21 +1373,32 @@ and interpret_c_instr_local context namespace c_instr_local =
             in
             (None, add_diagnostic mnamer_result diagnostic)
           else
-            let updated_location =
-              Complex.add_morphism location ~name ~domain morphism
+            let definition_span =
+              let mnamer_desc = mnamer.value in
+              Lang_ast.span_of_node mnamer_desc.mnamer_definition
             in
-            let updated_root_location =
-              Complex.add_morphism root_location ~name ~domain morphism
-            in
-            let state_with_root =
-              State.update_type_complex context_after.state ~id:root
-                updated_root_location
-            in
-            let context_updated = with_state context_after state_with_root in
-            let updated_result =
-              { mnamer_result with context= context_updated }
-            in
-            (Some updated_location, updated_result))
+            if Morphism.has_local_labels morphism then
+              let diagnostic =
+                Diagnostics.make `Error interpreter_producer definition_span
+                  "Named maps must only be valued in global cells"
+              in
+              (None, add_diagnostic mnamer_result diagnostic)
+            else
+              let updated_location =
+                Complex.add_morphism location ~name ~domain morphism
+              in
+              let updated_root_location =
+                Complex.add_morphism root_location ~name ~domain morphism
+              in
+              let state_with_root =
+                State.update_type_complex context_after.state ~id:root
+                  updated_root_location
+              in
+              let context_updated = with_state context_after state_with_root in
+              let updated_result =
+                { mnamer_result with context= context_updated }
+              in
+              (Some updated_location, updated_result))
   | Lang_ast.C_instr_local_assert assert_stmt -> (
       let term_pair_opt, assert_result =
         interpret_assert context ~location assert_stmt
@@ -2661,35 +2682,40 @@ and interpret_c_instr_type ~loader context
                     in
                     let alias_prefix = alias_str in
                     let extend_generators acc gen_name =
-                      let gen_entry =
-                        match
-                          Complex.find_generator module_location gen_name
-                        with
-                        | Some entry ->
-                            entry
-                        | None ->
-                            assert false
-                      in
-                      if
-                        Option.is_some
-                          (Complex.find_generator_by_tag acc gen_entry.tag)
-                      then acc
+                      if String.equal (Id.Local.to_string gen_name) "" then acc
                       else
-                        let classifier =
-                          match Complex.classifier module_location gen_name with
-                          | Some diagram ->
-                              diagram
+                        let gen_entry =
+                          match
+                            Complex.find_generator module_location gen_name
+                          with
+                          | Some entry ->
+                              entry
                           | None ->
                               assert false
                         in
-                        let gen_name_str = Id.Local.to_string gen_name in
-                        let combined_name =
-                          if String.equal alias_prefix "" then gen_name_str
-                          else if String.equal gen_name_str "" then alias_prefix
-                          else alias_prefix ^ "." ^ gen_name_str
-                        in
-                        let new_name = Id.Local.make combined_name in
-                        Complex.add_generator acc ~name:new_name ~classifier
+                        if
+                          Option.is_some
+                            (Complex.find_generator_by_tag acc gen_entry.tag)
+                        then acc
+                        else
+                          let classifier =
+                            match
+                              Complex.classifier module_location gen_name
+                            with
+                            | Some diagram ->
+                                diagram
+                            | None ->
+                                assert false
+                          in
+                          let gen_name_str = Id.Local.to_string gen_name in
+                          let combined_name =
+                            if String.equal alias_prefix "" then gen_name_str
+                            else if String.equal gen_name_str "" then
+                              alias_prefix
+                            else alias_prefix ^ "." ^ gen_name_str
+                          in
+                          let new_name = Id.Local.make combined_name in
+                          Complex.add_generator acc ~name:new_name ~classifier
                     in
                     let location_with_generators =
                       List.fold_left extend_generators location

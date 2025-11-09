@@ -83,6 +83,11 @@ let dimensions m = IntMap.bindings m.by_dim |> List.map fst
 let domain_by_dim m =
   IntMap.bindings m.by_dim |> List.map (fun (dim, tags) -> (dim, List.rev tags))
 
+let has_local_labels m =
+  TagTable.fold
+    (fun _ { image; _ } acc -> acc || Diagram.has_local_labels image)
+    m.table false
+
 let apply f diagram =
   let image_exn tag =
     match image f tag with Ok d -> d | Error _ -> assert false

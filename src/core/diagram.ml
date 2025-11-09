@@ -321,3 +321,8 @@ let isomorphism_of u v =
         let pulled = pullback_data v iso in
         if labels_equal u.labels pulled.labels then Ok iso
         else Error (Error.make "labels do not match")
+
+let has_local_labels diagram =
+  Array.exists
+    (Array.exists (function `Local _ -> true | `Global _ -> false))
+    diagram.labels

@@ -30,6 +30,7 @@ val domain_in_dim : t -> int -> Id.Tag.t list
 val dimensions : t -> int list
 val domain_by_dim : t -> (int * Id.Tag.t list) list
 val is_defined_at : t -> Id.Tag.t -> bool
+val has_local_labels : t -> bool
 
 (** {2 Destructor} *)
 val apply : t -> Diagram.t -> Diagram.t checked

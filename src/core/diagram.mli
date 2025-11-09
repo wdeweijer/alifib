@@ -54,6 +54,7 @@ val boundary : sign -> int -> t -> t checked
 val boundary_normal : sign -> int -> t -> t checked
 val is_cell : t -> bool
 val label_set_of : t -> (Id.Tag.t * int) list
+val has_local_labels : t -> bool
 
 (** {2 Isomorphism} *)
 val isomorphic : t -> t -> bool
