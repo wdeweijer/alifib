@@ -2132,15 +2132,6 @@ and interpret_m_instr context ~location ~source ~morphism m_instr =
             Diagnostics.make `Error interpreter_producer span message
           in
           (None, add_diagnostic combined_result diagnostic)
-        else if not (Morphism.is_cellular m_left) then
-          let message =
-            "The left-hand side of an assignment must be a cell or a cellular \
-             map"
-          in
-          let diagnostic =
-            Diagnostics.make `Error interpreter_producer span message
-          in
-          (None, add_diagnostic combined_result diagnostic)
         else
           let generators =
             Complex.generator_names src_left
@@ -2163,22 +2154,35 @@ and interpret_m_instr context ~location ~source ~morphism m_instr =
                   match Morphism.image m_left tag with
                   | Error err ->
                       Error err
-                  | Ok left_image -> (
-                      let left_labels = Diagram.labels left_image in
-                      let tag_left = left_labels.(dim).(0) in
-                      match Morphism.image m_right tag with
-                      | Error err ->
-                          Error err
-                      | Ok image -> (
-                          match
-                            smart_extend context_after extended_morphism ~source
-                              ~target:target_location ~tag:tag_left ~dim
-                              ~diagram:image
-                          with
-                          | Ok updated ->
-                              assign updated rest
-                          | Error err ->
-                              Error err))
+                  | Ok left_image ->
+                      if Diagram.is_cell left_image then
+                        let left_labels = Diagram.labels left_image in
+                        let tag_left = left_labels.(dim).(0) in
+                        match Morphism.image m_right tag with
+                        | Error err ->
+                            Error err
+                        | Ok image -> (
+                            match
+                              smart_extend context_after extended_morphism
+                                ~source ~target:target_location ~tag:tag_left
+                                ~dim ~diagram:image
+                            with
+                            | Ok updated ->
+                                assign updated rest
+                            | Error err ->
+                                Error err)
+                      else
+                        let all_defined =
+                          Diagram.label_set_of left_image
+                          |> List.for_all (fun (tag_left, _) ->
+                                 Morphism.is_defined_at extended_morphism
+                                   tag_left)
+                        in
+                        if all_defined then assign extended_morphism rest
+                        else
+                          Error
+                            (Error.make
+                               "Failed to extend map (not enough information)")
                 else if defined_left && not defined_right then
                   let message =
                     Format.asprintf
