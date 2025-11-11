@@ -52,8 +52,8 @@ Comp <<= {
     inv => (fst.left_id.inv #0 snd.left_id.inv) (fst.dom.id fst.right_id.dir snd.mor)
   ],
   let right_id :: Eq = [    
-    dir => (fst.mor #0 (snd.right_id.dir snd.left_id.inv)) (fst.right_id.dir snd.mor),
-    inv => (fst.mor #0 (snd.right_id.inv (snd.left_id.inv snd.cod.id))) 
+    dir => (fst.mor (snd.right_id.dir snd.left_id.inv)) (fst.right_id.dir snd.mor),
+    inv => (fst.mor (snd.right_id.inv (snd.left_id.inv snd.cod.id))) 
       (fst.right_id.dir snd.mor snd.cod.id)
   ]
 

@@ -85,6 +85,27 @@ let pp fmt state =
       let s = Id.Local.to_string name in
       if String.length s = 0 then "<empty>" else s
     in
+    let render_cells_by_dim type_complex =
+      let dims =
+        Complex.generator_names type_complex
+        |> List.filter_map (fun name -> Complex.generator_dim type_complex name)
+        |> List.sort_uniq Int.compare
+      in
+      match dims with
+      | [] ->
+          "(none)"
+      | _ ->
+          dims
+          |> List.map (fun dim ->
+                 let rendered =
+                   Complex.generators_in_dim type_complex dim
+                   |> List.map string_or_empty |> List.sort String.compare
+                   |> String.concat ", "
+                 in
+                 if String.length rendered = 0 then Printf.sprintf "[%d]" dim
+                 else Printf.sprintf "[%d] %s" dim rendered)
+          |> String.concat ", "
+    in
     let pp_module fmt (module_id, module_complex) =
       fprintf fmt "@[<v>* Module %s" (Id.Module.to_string module_id)
       ; let generator_names = Complex.generator_names module_complex in
@@ -103,34 +124,31 @@ let pp fmt state =
         in
         let pp_type fmt generator_name =
           let type_label = string_or_empty generator_name in
-          let print_details cells diagrams morphisms =
+          let print_details ~cells ~diagrams ~morphisms =
             fprintf fmt
               "@[<v 2>Type %s@,- Cells: %s@,- Diagrams: %s@,- Maps: %s@]"
-              type_label (render_list cells) (render_list diagrams)
-              (render_list morphisms)
+              type_label cells diagrams morphisms
           in
           match Complex.find_generator module_complex generator_name with
           | None ->
-              print_details [ "(missing generator)" ] [ "(missing generator)" ]
-                [ "(missing generator)" ]
+              let missing = "(missing generator)" in
+              print_details ~cells:missing ~diagrams:missing ~morphisms:missing
           | Some { tag; _ } -> (
               match tag with
               | `Local _ ->
-                  print_details [ "(local tag)" ] [ "(local tag)" ]
-                    [ "(local tag)" ]
+                  let local = "(local tag)" in
+                  print_details ~cells:local ~diagrams:local ~morphisms:local
               | `Global global_id -> (
                   match find_type state global_id with
                   | None ->
-                      print_details [ "(type not found)" ]
-                        [ "(type not found)" ] [ "(type not found)" ]
+                      let missing = "(type not found)" in
+                      print_details ~cells:missing ~diagrams:missing
+                        ~morphisms:missing
                   | Some { complex= type_complex; _ } ->
-                      let cells =
-                        Complex.generator_names type_complex
-                        |> List.map string_or_empty
-                      in
+                      let cells = render_cells_by_dim type_complex in
                       let diagrams =
                         Complex.diagram_names type_complex
-                        |> List.map string_or_empty
+                        |> List.map string_or_empty |> render_list
                       in
                       let morphisms =
                         Complex.morphism_names type_complex
@@ -147,8 +165,9 @@ let pp fmt state =
                                Printf.sprintf "%s :: %s"
                                  (string_or_empty morph_name)
                                  domain_label)
+                        |> render_list
                       in
-                      print_details cells diagrams morphisms))
+                      print_details ~cells ~diagrams ~morphisms))
         in
         if generator_names <> [] then (
           fprintf fmt "@,"
