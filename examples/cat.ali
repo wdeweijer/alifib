@@ -1,4 +1,5 @@
 @Type
+(* Equation between morphisms *)
 Eq <<= {
   s,
   t,
@@ -8,6 +9,7 @@ Eq <<= {
   inv: rhs -> lhs
 }
 
+(* Object with identity *)
 Ob <<= {
   ob,
   id: ob -> ob
@@ -18,6 +20,7 @@ Ob <<= {
   ]
 }
 
+(* Morphism *)
 Mor <<= {
   attach dom :: Ob,
   attach cod :: Ob
@@ -34,6 +37,7 @@ Mor <<= {
   ]
 }
 
+(* Pair of composable morphisms *)
 Comp <<= {
   attach fst :: Mor,
   attach snd :: Mor along [
@@ -61,3 +65,13 @@ Comp <<= {
     r_unit => r_unit
   ]
 }
+
+(* The identity on an object is a morphism *)
+@Ob
+let Id :: Mor = [
+  dom => Ob,
+  cod => Ob,
+  mor => id,
+  l_unit => id_is_idem,
+  r_unit => id_is_idem
+]
