@@ -1,41 +1,35 @@
-Program ::= { Block }
-Block ::= "@" "Type" [ CBlockType ] | "@" Complex [ CBlockLocal ]
+Program ::= Block*
+Block ::= "@" "Type"  { CInstrType  "," }
+        | "@" Complex { CInstrLocal "," }
 
-Complex ::= Address | [ Address ] "{" [ CBlock ] "}"
+Complex ::= Address
+          | [ Address ] "{" { CInstr "," } "}"
 
-CBlockType ::= CInstrType { "," CInstrType }
 CInstrType ::= GeneratorType | DNamer | MNamer | IncludeModule
-
-CBlock ::= CInstr { "," CInstr }
-CInstr ::= Generator | DNamer | MNamer | IncludeStatement | AttachStatement
-
-CBlockLocal ::= CInstrLocal { "," CInstrLocal } 
 CInstrLocal ::= DNamer | MNamer | AssertStatement
+CInstr ::= Generator | DNamer | MNamer | IncludeStatement | AttachStatement
 
 GeneratorType ::= Generator "<<=" Complex
 Generator ::= Name [ ":" Boundaries ]
 
 Address ::= Name { "." Name }
 
-Morphism ::= MComp | Morphism "." MComp
+Morphism ::= MComp { "." MComp }
 MComp ::= MTerm | Name
 MTerm ::= "(" "map" MExt "::" Complex ")"
-MExt ::= [ Morphism ] "[" [ MBlock ] "]"
+MExt ::= [ Morphism ] "[" { MInstr "," } "]"
 
 MDef ::= Morphism | MExt
 MNamer ::= "let" Name "::" Address "=" MDef
-MBlock ::= MInstr { "," MInstr }
 MInstr ::= Pasting "=>" Pasting
 
-Diagram ::= DConcat | Diagram "#" Nat DConcat
-DConcat ::= DExpr | DConcat DExpr
-DExpr ::= DComp | DExpr "." DComp
+Diagram ::= DExpr+ { "#" Nat DExpr+ }
+DExpr ::= DComp { "." DComp }
 DComp ::= MTerm | DTerm | Name | Bd | "?"
-DTerm ::= "(" Diagram "#" Nat DConcat ")" | "(" DConcat DExpr ")"
+DTerm ::= "(" Diagram "#" Nat DExpr+ ")" | "(" DExpr+ DExpr ")"
 Bd ::= "in" | "out"
 
-Pasting ::= Concat | Pasting "#" Nat Concat
-Concat ::= DExpr | Concat DExpr
+Pasting ::= DExpr+ { "#" Nat DExpr+ }
 
 DNamer ::= "let" Name [ ":" Boundaries ] "=" Diagram
 Boundaries ::= Diagram "->" Diagram
@@ -46,4 +40,4 @@ AttachStatement ::= "attach" Name "::" Address [ "along" MDef ]
 AssertStatement ::= "assert" Pasting "=" Pasting
 
 Nat ::= 0 | [1-9][0-9]*
-Name ::= [A-Za-z0-9_][A-Za-z0-9_]*
+Name ::= [A-Za-z0-9_][A-Za-z0-9_']*
