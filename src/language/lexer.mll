@@ -157,7 +157,7 @@ rule token env = parse
       reset_newlines env;
       make_token env Hole lexbuf
     }
-  | ['A'-'Z' 'a'-'z' '0'-'9' '_']+ as ident {
+  | ['A'-'Z' 'a'-'z' '0'-'9' '_']['A'-'Z' 'a'-'z' '0'-'9' '_' '\'']* as ident {
       reset_newlines env;
       let kind =
         match keyword_of_string ident with
