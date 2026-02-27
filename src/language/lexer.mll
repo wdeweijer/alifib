@@ -65,7 +65,7 @@ rule token env = parse
       reset_newlines env;
       let start_pos = Lexing.lexeme_start_p lexbuf in
       let buffer = Buffer.create 32 in
-      comment env buffer start_pos lexbuf
+      comment env buffer start_pos 0 lexbuf
     }
   | "@" {
       reset_newlines env;
@@ -182,23 +182,28 @@ rule token env = parse
       add_diagnostic env span message;
       Token.make (Token.Error message) span
     }
-
-and comment env buffer start_pos = parse
+(* TODO: Do something nicer so we dont have to repeat all the arguments to `comment`
+  everywhere and so we don't have the magic `0` depth value at the call site *)
+and comment env buffer start_pos depth = parse
+  | "(*" {
+      Buffer.add_string buffer (Lexing.lexeme lexbuf);
+      comment env buffer start_pos (depth + 1) lexbuf
+    }
   | "*)" {
-      let span =
-        Pos.span_of_lexing env.source start_pos (Lexing.lexeme_end_p lexbuf)
-      in
-      Token.make (Token.Trivia (Token.Comment (Buffer.contents buffer))) span
+      if depth = 0 then
+        let span =
+          Pos.span_of_lexing env.source start_pos (Lexing.lexeme_end_p lexbuf)
+        in
+        Token.make (Token.Trivia (Token.Comment (Buffer.contents buffer))) span
+      else (
+        Buffer.add_string buffer (Lexing.lexeme lexbuf);
+        comment env buffer start_pos (depth - 1) lexbuf
+      )
     }
-  | "\r\n" {
+  | "\r\n" | "\n" {
       Buffer.add_string buffer (Lexing.lexeme lexbuf);
       Lexing.new_line lexbuf;
-      comment env buffer start_pos lexbuf
-    }
-  | "\n" {
-      Buffer.add_string buffer (Lexing.lexeme lexbuf);
-      Lexing.new_line lexbuf;
-      comment env buffer start_pos lexbuf
+      comment env buffer start_pos depth lexbuf
     }
   | eof {
       let span =
@@ -209,7 +214,7 @@ and comment env buffer start_pos = parse
     }
   | _ {
       Buffer.add_string buffer (Lexing.lexeme lexbuf);
-      comment env buffer start_pos lexbuf
+      comment env buffer start_pos depth lexbuf
     }
 
 {
