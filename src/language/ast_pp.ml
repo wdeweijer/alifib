@@ -4,16 +4,16 @@ open Ast
 let list_sep fmt () = fprintf fmt ";@ "
 
 let pp_list printer fmt values =
-  fprintf fmt "@[<hv 1>[%a]@]" (pp_print_list ~pp_sep:list_sep printer) values
+  fprintf fmt "@[<v 1>[%a]@]" (pp_print_list ~pp_sep:list_sep printer) values
 
 let pp_option printer fmt = function
   | None ->
       fprintf fmt "None"
   | Some value ->
-      fprintf fmt "Some(@[%a@])" printer value
+      fprintf fmt "Some(@;<0 2>@[%a@])" printer value
 
 let pp_field name printer fmt value =
-  fprintf fmt "@[%s = %a@]" name printer value
+  fprintf fmt "@[%s =@;<1 2>%a@]" name printer value
 
 let pp_name fmt name = fprintf fmt "%s" (Id.Local.to_string name.value)
 let pp_nat fmt nat = fprintf fmt "%d" nat.value
@@ -32,14 +32,14 @@ let pp_address fmt address =
     segments
 
 let rec pp_program fmt program =
-  fprintf fmt "@[<v 2>(Program@,%a)@]"
+  fprintf fmt "@[<hv 2>(Program@ %a)@]"
     (pp_field "blocks" (pp_list block))
     program.value.program_blocks
 
 and block fmt block =
   match block.value with
   | Block_type { block_type_body } ->
-      fprintf fmt "@[<v 2>(Block_type@,%a)@]"
+      fprintf fmt "@[<hv 2>(Block_type@ %a)@]"
         (pp_field "body" (pp_option c_block_type))
         block_type_body
   | Block_complex { block_complex_body; block_local_body } ->
@@ -64,35 +64,35 @@ and c_block_local fmt block = pp_list c_instr_local fmt block.value
 and c_instr_type fmt instr =
   match instr.value with
   | C_instr_type_generator gt ->
-      fprintf fmt "@[<v 2>(Generator_type@ %a)@]" generator_type gt
+      fprintf fmt "@[<hv 2>(Generator_type@ %a)@]" generator_type gt
   | C_instr_type_dnamer dn ->
-      fprintf fmt "@[<v 2>(Diagram_namer@ %a)@]" dnamer dn
+      fprintf fmt "@[<hv 2>(Diagram_namer@ %a)@]" dnamer dn
   | C_instr_type_mnamer mn ->
-      fprintf fmt "@[<v 2>(Morphism_namer@ %a)@]" mnamer mn
+      fprintf fmt "@[<hv 2>(Morphism_namer@ %a)@]" mnamer mn
   | C_instr_type_include_module inc ->
-      fprintf fmt "@[<v 2>(Include_module@ %a)@]" include_module inc
+      fprintf fmt "@[<hv 2>(Include_module@ %a)@]" include_module inc
 
 and c_instr fmt instr =
   match instr.value with
   | C_instr_generator g ->
-      fprintf fmt "@[<v 2>(Generator@ %a)@]" generator g
+      fprintf fmt "@[<hv 2>(Generator@ %a)@]" generator g
   | C_instr_dnamer dn ->
-      fprintf fmt "@[<v 2>(Diagram_namer@ %a)@]" dnamer dn
+      fprintf fmt "@[<hv 2>(Diagram_namer@ %a)@]" dnamer dn
   | C_instr_mnamer mn ->
-      fprintf fmt "@[<v 2>(Morphism_namer@ %a)@]" mnamer mn
+      fprintf fmt "@[<hv 2>(Morphism_namer@ %a)@]" mnamer mn
   | C_instr_include inc ->
-      fprintf fmt "@[<v 2>(Include@ %a)@]" include_statement inc
+      fprintf fmt "@[<hv 2>(Include@ %a)@]" include_statement inc
   | C_instr_attach att ->
-      fprintf fmt "@[<v 2>(Attach@ %a)@]" attach_statement att
+      fprintf fmt "@[<hv 2>(Attach@ %a)@]" attach_statement att
 
 and c_instr_local fmt instr =
   match instr.value with
   | C_instr_local_dnamer dn ->
-      fprintf fmt "@[<v 2>(Diagram_namer@ %a)@]" dnamer dn
+      fprintf fmt "@[<hv 2>(Diagram_namer@ %a)@]" dnamer dn
   | C_instr_local_mnamer mn ->
-      fprintf fmt "@[<v 2>(Morphism_namer@ %a)@]" mnamer mn
+      fprintf fmt "@[<hv 2>(Morphism_namer@ %a)@]" mnamer mn
   | C_instr_local_assert asrt ->
-      fprintf fmt "@[<v 2>(Assert@ %a)@]" assert_statement asrt
+      fprintf fmt "@[<hv 2>(Assert@ %a)@]" assert_statement asrt
 
 and generator_type fmt gt =
   let { generator_type_generator; generator_type_definition } = gt.value in
@@ -121,7 +121,7 @@ and address fmt address = pp_address fmt address
 and morphism fmt m =
   match m.value with
   | Morphism_single comp ->
-      fprintf fmt "@[<v 2>(Morphism_single@ %a)@]" m_comp comp
+      fprintf fmt "@[<hv 2>(Morphism_single@ %a)@]" m_comp comp
   | Morphism_concat { morphism_left; morphism_right } ->
       fprintf fmt "@[<v 2>(Morphism_concat@,%a@,%a)@]"
         (pp_field "left" morphism) morphism_left (pp_field "right" m_comp)
@@ -130,9 +130,9 @@ and morphism fmt m =
 and m_comp fmt comp =
   match comp.value with
   | M_comp_term term ->
-      fprintf fmt "@[<v 2>(MTerm@ %a)@]" m_term term
+      fprintf fmt "@[<hv 2>(MTerm@ %a)@]" m_term term
   | M_comp_name name ->
-      fprintf fmt "@[<v 2>(MName@ %a)@]" pp_name name
+      fprintf fmt "@[<hv 2>(MName@ %a)@]" pp_name name
 
 and m_term fmt term =
   let { m_term_ext; m_term_target } = term.value in
@@ -151,9 +151,9 @@ and m_ext fmt ext =
 and m_def fmt def =
   match def.value with
   | M_def_morphism morph ->
-      fprintf fmt "@[<v 2>(MDef_morphism@ %a)@]" morphism morph
+      fprintf fmt "@[<hv 2>(MDef_morphism@ %a)@]" morphism morph
   | M_def_ext ext ->
-      fprintf fmt "@[<v 2>(MDef_ext@ %a)@]" m_ext ext
+      fprintf fmt "@[<hv 2>(MDef_ext@ %a)@]" m_ext ext
 
 and m_block fmt block = pp_list m_instr fmt block.value
 
@@ -213,7 +213,7 @@ and assert_statement fmt assertion =
 and diagram fmt d =
   match d.value with
   | Diagram_single concat ->
-      fprintf fmt "@[<v 2>(Diagram_single@ %a)@]" d_concat concat
+      fprintf fmt "@[<hv 2>(Diagram_single@ %a)@]" d_concat concat
   | Diagram_paste { diagram_left; diagram_nat; diagram_right } ->
       fprintf fmt "@[<v 2>(Diagram_paste@,%a@,%a@,%a)@]"
         (pp_field "left" diagram) diagram_left (pp_field "nat" pp_nat)
@@ -224,7 +224,7 @@ and diagram fmt d =
 and d_concat fmt concat =
   match concat.value with
   | D_concat_single expr ->
-      fprintf fmt "@[<v 2>(DConcat_single@ %a)@]" d_expr expr
+      fprintf fmt "@[<hv 2>(DConcat_single@ %a)@]" d_expr expr
   | D_concat_concat { d_concat_left; d_concat_right } ->
       fprintf fmt "@[<v 2>(DConcat_concat@,%a@,%a)@]" (pp_field "left" d_concat)
         d_concat_left (pp_field "right" d_expr) d_concat_right
@@ -232,7 +232,7 @@ and d_concat fmt concat =
 and d_expr fmt expr =
   match expr.value with
   | D_expr_single comp ->
-      fprintf fmt "@[<v 2>(DExpr_single@ %a)@]" d_comp comp
+      fprintf fmt "@[<hv 2>(DExpr_single@ %a)@]" d_comp comp
   | D_expr_dot { d_expr_left; d_expr_right } ->
       fprintf fmt "@[<v 2>(DExpr_dot@,%a@,%a)@]" (pp_field "left" d_expr)
         d_expr_left (pp_field "right" d_comp) d_expr_right
@@ -240,13 +240,13 @@ and d_expr fmt expr =
 and d_comp fmt comp =
   match comp.value with
   | D_comp_mterm term ->
-      fprintf fmt "@[<v 2>(DComp_mterm@ %a)@]" m_term term
+      fprintf fmt "@[<hv 2>(DComp_mterm@ %a)@]" m_term term
   | D_comp_dterm term ->
-      fprintf fmt "@[<v 2>(DComp_dterm@ %a)@]" d_term term
+      fprintf fmt "@[<hv 2>(DComp_dterm@ %a)@]" d_term term
   | D_comp_name name ->
-      fprintf fmt "@[<v 2>(DComp_name@ %a)@]" pp_name name
+      fprintf fmt "@[<hv 2>(DComp_name@ %a)@]" pp_name name
   | D_comp_bd bd ->
-      fprintf fmt "@[<v 2>(DComp_bd@ %a)@]" pp_bd bd
+      fprintf fmt "@[<hv 2>(DComp_bd@ %a)@]" pp_bd bd
   | D_comp_hole ->
       fprintf fmt "DComp_hole"
 
@@ -265,7 +265,7 @@ and d_term fmt term =
 and pasting fmt p =
   match p.value with
   | Pasting_single c ->
-      fprintf fmt "@[<v 2>(Pasting_single@ %a)@]" concat c
+      fprintf fmt "@[<hv 2>(Pasting_single@ %a)@]" concat c
   | Pasting_paste { pasting_left; pasting_nat; pasting_right } ->
       fprintf fmt "@[<v 2>(Pasting_paste@,%a@,%a@,%a)@]"
         (pp_field "left" pasting) pasting_left (pp_field "nat" pp_nat)
@@ -274,10 +274,12 @@ and pasting fmt p =
 and concat fmt c =
   match c.value with
   | Concat_single e ->
-      fprintf fmt "@[<v 2>(Concat_single@ %a)@]" d_expr e
+      fprintf fmt "@[<hv 2>(Concat_single@ %a)@]" d_expr e
   | Concat_concat { concat_left; concat_right } ->
       fprintf fmt "@[<v 2>(Concat_concat@,%a@,%a)@]" (pp_field "left" concat)
         concat_left (pp_field "right" d_expr) concat_right
 
 let program = pp_program
-let to_string program = asprintf "%a" pp_program program
+let to_string program =
+  Format.pp_set_max_indent Format.str_formatter 5;
+  asprintf "%t%a" (fun fmt -> pp_set_geometry fmt ~max_indent:70 ~margin:80) pp_program program
