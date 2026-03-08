@@ -1,8 +1,10 @@
+open Sexplib.Std
+
 type error = Error.t
 type 'a checked = 'a Error.checked
 
 module Global = struct
-  type t = int
+  type t = int [@@deriving sexp_of]
 
   let counter = ref 0
 
@@ -18,7 +20,7 @@ module Global = struct
 end
 
 module Local = struct
-  type t = string
+  type t = string [@@deriving sexp_of]
 
   let make s = s
   let to_string s = s
@@ -29,7 +31,7 @@ module Local = struct
 end
 
 module Module = struct
-  type t = string
+  type t = string [@@deriving sexp_of]
 
   let of_path path = path
   let to_string id = id
@@ -40,7 +42,7 @@ module Module = struct
 end
 
 module Tag = struct
-  type t = [ `Local of Local.t | `Global of Global.t ]
+  type t = [ `Local of Local.t | `Global of Global.t ] [@@deriving sexp_of]
 
   let equal a b =
     match (a, b) with

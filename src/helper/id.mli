@@ -2,7 +2,7 @@ type error = Error.t
 type 'a checked = 'a Error.checked
 
 module Global : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val fresh : unit -> t
   val equal : t -> t -> bool
@@ -13,7 +13,7 @@ module Global : sig
 end
 
 module Local : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val make : string -> t
   val to_string : t -> string
@@ -24,7 +24,7 @@ module Local : sig
 end
 
 module Module : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val of_path : string -> t
   val to_string : t -> string
@@ -35,7 +35,7 @@ module Module : sig
 end
 
 module Tag : sig
-  type t = [ `Local of Local.t | `Global of Global.t ]
+  type t = [ `Local of Local.t | `Global of Global.t ] [@@deriving sexp_of]
 
   val equal : t -> t -> bool
   val compare : t -> t -> int
