@@ -1,10 +1,10 @@
 (** {1 Interpreter State} *)
 
 (** {2 Core types} *)
-type t
+type t [@@deriving sexp_of]
 
-type type_entry = { data: Diagram.cell_data; complex: Complex.t }
-type cell_entry = { data: Diagram.cell_data; dim: int }
+type type_entry = { data: Diagram.cell_data; complex: Complex.t } [@@deriving sexp_of]
+type cell_entry = { data: Diagram.cell_data; dim: int } [@@deriving sexp_of]
 
 (** {2 Constructors} *)
 val empty : t

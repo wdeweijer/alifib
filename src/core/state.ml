@@ -50,8 +50,7 @@ let find_type state id = GlobalMap.find_opt id state.types
 let find_module state id = ModuleMap.find_opt id state.modules
 
 let pp fmt state =
-  Format.fprintf fmt "%a" Sexplib.Sexp.pp_hum (sexp_of_t state)
-  (* let open Format in
+  let open Format in
   let cells_count = GlobalMap.cardinal state.cells.by_id in
   let types_count = GlobalMap.cardinal state.types in
   let modules_count = ModuleMap.cardinal state.modules in
@@ -160,4 +159,4 @@ let pp fmt state =
     pp_print_list
       ~pp_sep:(fun fmt () -> fprintf fmt "@,@,")
       pp_module fmt module_entries
-    ; fprintf fmt "@]" *)
+    ; fprintf fmt "@]"
