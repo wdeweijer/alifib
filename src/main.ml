@@ -1,6 +1,6 @@
 open Format
 
-type mode = Interpret | Ast
+type mode = Interpret | Ast | Sexp
 
 let usage = "Usage: alifib <input-file> [-o|--output <output-file>] [--ast]"
 let read_file path = In_channel.with_open_bin path In_channel.input_all
@@ -32,6 +32,10 @@ let parse_args () =
       ( "--ast",
         Arg.Unit (fun () -> mode := Ast),
         "Pretty-print the AST instead of running the interpreter" );
+      ( "--sexp",
+        Arg.Unit (fun () -> mode := Sexp),
+        "Give interpreter output as s-expression"
+        );
     ]
   in
   let anon_fun arg =
@@ -71,12 +75,16 @@ let run_ast input_path output_path =
     print_or_write ?output:output_path rendered
     ; if has_error diagnostics then exit 1
 
-let run_interpreter input_path output_path =
+let run_interpreter ?(sexp=false) input_path output_path =
   let result = Session.run ~path:input_path () in
   let open Session in
   let { diagnostics; context; status } = result in
   let state = Interpreter.context_state context in
-  let rendered = Format.asprintf "%a" State.pp state in
+  let rendered =
+    if sexp then
+      Format.asprintf "%a" Sexplib.Sexp.pp_hum (State.sexp_of_t state)
+    else Format.asprintf "%a" State.pp state
+  in
   print_or_write ?output:output_path rendered
   ; if diagnostics <> [] then eprintf "%a@." Diagnostics.Report.pp diagnostics
   ; let has_diag_error = has_error diagnostics in
@@ -96,3 +104,5 @@ let () =
       run_ast input_path output_path
   | Interpret ->
       run_interpreter input_path output_path
+  | Sexp ->
+      run_interpreter input_path output_path ~sexp:true
